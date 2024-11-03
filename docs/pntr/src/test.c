@@ -8,17 +8,17 @@
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 480
 
-FILE* fb;
-pntr_image* screen;
-int x[3] = {0,0,0};
-int y[3] = {0,0,0};
+static FILE* fb;
+static pntr_image* screen;
+static int x[3] = {0,0,0};
+static int y[3] = {0,0,0};
 
-int frameCount = 0;
-time_t previousTime = 0;
-time_t currentTime = 0;
-int fps = 0;
-pntr_font* defaultFont;
-char fpsText[3];
+static int frameCount = 0;
+static time_t previousTime = 0;
+static time_t currentTime = 0;
+static int fps = 0;
+static pntr_font* defaultFont;
+static char fpsText[3];
 
 char* itoa(int value, char* result, int base) {
     // check that the base if valid
