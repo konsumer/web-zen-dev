@@ -34,7 +34,7 @@ import { IndexedDB } from '@zenfs/dom'
 import WebDevFS from 'web-zen-dev'
 
 await configure({
-	addDevices: true
+  addDevices: true
 })
 
 const canvas = document.getElementById('fb')
