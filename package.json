@@ -1,5 +1,6 @@
 {
 	"scripts": {
-		"start": "npx -y live-server docs"
+		"start": "npx -y live-server docs",
+		"demo": "cd pntr_demo && make"
 	}
 }
