@@ -2,6 +2,10 @@ Write old-linux-style code in any language that targets wasm/wasi, and run it on
 
 I wanted to be able to use my [easywasi](https://github.com/konsumer/easywasi) with [zenfs](https://www.npmjs.com/package/@zenfs/core) to output graphics/sound and read input, over WASI fs.
 
+## demos
+
+- [static](https://konsumer.js.org/web-zen-dev/)
+- [drawing](https://konsumer.js.org/web-zen-dev/pntr)
 
 ## devices
 
