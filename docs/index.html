@@ -61,16 +61,15 @@ function makestaticFb() {
 makestaticFb()
 
 // example: write static to audio
-const audioFrame = new Uint8Array(48000)
-const audioView = new DataView(audioFrame.buffer)
-function makestaticDsp() {
-	for (let i=0; i<audioFrame.byteLength;i+=4) {
-		audioView.setFloat32(i, Math.random() * 2 - 1) 
+const audioBuffer = new ArrayBuffer(wd.audioCtx.sampleRate * 4)
+const audioBytes = new Uint8Array(audioBuffer)
+const audioFloats = new Float32Array(audioBuffer)
+setInterval(() => {
+	for (let i in audioFloats){
+		audioFloats[i] = Math.random() * 2 - 1
 	}
-	fs.promises.writeFile('/dev/dsp', audioFrame)
-	requestAnimationFrame(makestaticDsp)
-}
-makestaticDsp()
+	fs.promises.writeFile('/dev/dsp', audioBytes)
+}, 1000)
 
 </script>
 </body>

@@ -8,9 +8,7 @@ const workletUrl = URL.createObjectURL(new Blob([`
 class WebDevFSDsp extends AudioWorkletProcessor {
   constructor (...args) {
     super(...args)
-    this.port.onmessage = (e) => {
-      this.buffer = e.data
-    }
+    this.port.onmessage = e => this.buffer = e.data
   }
 
   // STATIC
@@ -23,13 +21,11 @@ class WebDevFSDsp extends AudioWorkletProcessor {
   //   return true
   // }
 
-  // NOT WORKING
   process (inputs, outputs, parameters) {
-    outputs[0].forEach((channel) => {
-      for (let i = 0; i < channel.length; i++) {
-        channel[i] = this.buffer[(currentFrame * channel.length) + i]
-      }
-    })
+    if (this.buffer) {
+      const c = currentFrame % sampleRate
+      outputs[0][0].set(this.buffer.slice(c, c+128))
+    }
     return true
   }
 
@@ -68,13 +64,14 @@ export class WebDevFS {
 
   dsp (audioCtx = new AudioContext()) {
     this.audioCtx = audioCtx
+    this.audioBuffer = new ArrayBuffer(audioCtx.sampleRate * 4)
+
     audioCtx.audioWorklet.addModule(workletUrl).then(() => {
       this.dsp = new AudioWorkletNode(
         audioCtx,
         'webdevfs-dsp'
       )
       this.dsp.connect(audioCtx.destination)
-      this.audioBuffer = new Uint8Array(audioCtx.sampleRate)
       this.dsp.port?.postMessage(this.audioBuffer)
     })
 
@@ -101,8 +98,8 @@ export class WebDevFS {
       this.ctx.putImageData(imageData, 0, 0)
     }
     if (name === 'dsp' && data.byteLength && this.audioBuffer) {
-      this.audioBuffer.set(data)
-      this.dsp.port?.postMessage(this.audioBuffer)
+      new Uint8Array(this.audioBuffer).set(data)
+      this.dsp.port?.postMessage(new Float32Array(this.audioBuffer))
     }
   }
 }
