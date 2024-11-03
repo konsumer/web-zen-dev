@@ -11,16 +11,6 @@ class WebDevFSDsp extends AudioWorkletProcessor {
     this.port.onmessage = e => this.buffer = e.data
   }
 
-  // STATIC
-  // process (inputs, outputs, parameters) {
-  //   outputs[0].forEach((channel) => {
-  //     for (let i = 0; i < channel.length; i++) {
-  //       channel[i] = Math.random() * 2 - 1 * parameters.gain[0]
-  //     }
-  //   })
-  //   return true
-  // }
-
   process (inputs, outputs, parameters) {
     if (this.buffer) {
       const c = currentFrame % sampleRate

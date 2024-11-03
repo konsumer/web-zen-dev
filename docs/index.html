@@ -13,37 +13,23 @@
       }
     }
   </script>
-  <style type="text/css">
-    html, body {
-      height: 100vh;
-      margin: 0;
-      display:flex;
-      align-items: center;
-      background: black;
-    }
-    canvas {
-      width: 100vw;
-    }
-  </style>
+  <link rel="stylesheet" href="./demo.css">
 </head>
 <body>
+
+<canvas id="fb" width=640 height=480 />
 
 <script type="module">
 import { configure, InMemory, fs } from '@zenfs/core'
 import { IndexedDB } from '@zenfs/dom'
 import WebDevFS from 'web-zen-dev'
 
-await configure({
-  mounts: {
-    '/tmp': InMemory,
-    '/home': IndexedDB,
-  },
-  addDevices: true
-})
+await configure({ addDevices: true })
+const canvas = document.getElementById('fb')
 
 // TODO: work on a full backend-driver to make setup simpler
 const wd = new WebDevFS()
-fs.mounts.get('/dev').createDevice('/fb0', wd.framebuffer())
+fs.mounts.get('/dev').createDevice('/fb0', wd.framebuffer(canvas))
 fs.mounts.get('/dev').createDevice('/dsp', wd.dsp())
 
 // example: write static to framebuffer
