@@ -13,9 +13,6 @@ html, body {
 a {
   color:inherit;
 }
-p {
-  padding: 2em;
-}
 canvas {
   width: 100vw;
 }
