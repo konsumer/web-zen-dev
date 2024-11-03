@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>web-devfs</title>
+	<script type="importmap">
+    {
+      "imports": {
+      	"web-devfs": "./web-devfs.js",
+        "@zenfs/core": "https://esm.sh/@zenfs/core",
+        "@zenfs/dom": "https://esm.sh/@zenfs/dom"
+      }
+    }
+  </script>
+</head>
+<body>
+
+<canvas id="fb" width="320" height="240" />
+
+<script type="module">
+import { configure, InMemory, fs } from '@zenfs/core'
+import { IndexedDB } from '@zenfs/dom'
+import WebDevFS from 'web-devfs'
+
+await configure({
+	mounts: {
+		'/tmp': InMemory,
+		'/home': IndexedDB,
+	},
+	addDevices: true
+})
+
+// TODO: work on a full backend-driver to make setup simpler
+const canvas = document.getElementById('fb')
+const wd = new WebDevFS()
+fs.mounts.get('/dev').createDevice('/fb0', wd.framebuffer(canvas))
+fs.mounts.get('/dev').createDevice('/dsp', wd.dsp())
+
+const screen = new Uint8Array(320*240*4)
+const audioFrame = new Uint8Array(48000)
+const audioView = new DataView(audioFrame.buffer)
+
+// example: write static to framebuffer
+function makestaticFb() {
+	for (let i=0; i<screen.byteLength;i+=4) {
+		screen[i] = Math.random() * 255
+		screen[i+1] = Math.random() * 255
+		screen[i+2] = Math.random() * 255
+		screen[i+3] = 255
+	}
+	fs.promises.writeFile('/dev/fb0', screen)
+	requestAnimationFrame(makestaticFb)
+}
+makestaticFb()
+
+// example: write static to audio
+function makestaticDsp() {
+	for (let i=0; i<audioFrame.byteLength;i+=4) {
+		audioView.setFloat32(i, Math.random() * 2 - 1) 
+	}
+	fs.promises.writeFile('/dev/dsp', audioFrame)
+	requestAnimationFrame(makestaticDsp)
+}
+makestaticDsp()
+
+</script>
+</body>
+</html>
+
