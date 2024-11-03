@@ -1,5 +1,55 @@
 /* global ImageData, AudioContext, AudioWorkletNode */
 
+// I inline worker, so no seperate file is needed.
+const workletUrl = URL.createObjectURL(new Blob([`
+
+/* global AudioWorkletProcessor, registerProcessor, currentFrame, currentTime, sampleRate  */
+
+class WebDevFSDsp extends AudioWorkletProcessor {
+  constructor (...args) {
+    super(...args)
+    this.port.onmessage = (e) => {
+      this.buffer = e.data
+    }
+  }
+
+  // STATIC
+  // process (inputs, outputs, parameters) {
+  //   outputs[0].forEach((channel) => {
+  //     for (let i = 0; i < channel.length; i++) {
+  //       channel[i] = Math.random() * 2 - 1 * parameters.gain[0]
+  //     }
+  //   })
+  //   return true
+  // }
+
+  // NOT WORKING
+  process (inputs, outputs, parameters) {
+    outputs[0].forEach((channel) => {
+      for (let i = 0; i < channel.length; i++) {
+        channel[i] = this.buffer[(currentFrame * channel.length) + i]
+      }
+    })
+    return true
+  }
+
+  static get parameterDescriptors () {
+    return [
+      {
+        name: 'gain',
+        defaultValue: 1,
+        minValue: 0,
+        maxValue: 1,
+        automationRate: 'a-rate'
+      }
+    ]
+  }
+}
+
+registerProcessor('webdevfs-dsp', WebDevFSDsp)
+
+`], { type: 'application/javascript' }))
+
 export class WebDevFS {
   framebuffer (canvas) {
     if (typeof canvas === 'undefined') {
@@ -18,14 +68,14 @@ export class WebDevFS {
 
   dsp (audioCtx = new AudioContext()) {
     this.audioCtx = audioCtx
-
-    // TODO: inline this, so a seperate file is not needed
-    audioCtx.audioWorklet.addModule('webdevfs-dsp.js').then(() => {
+    audioCtx.audioWorklet.addModule(workletUrl).then(() => {
       this.dsp = new AudioWorkletNode(
         audioCtx,
         'webdevfs-dsp'
       )
       this.dsp.connect(audioCtx.destination)
+      this.audioBuffer = new Uint8Array(audioCtx.sampleRate)
+      this.dsp.port?.postMessage(this.audioBuffer)
     })
 
     // add a click-handler to resume (due to web security) https://goo.gl/7K7WLu
@@ -50,8 +100,9 @@ export class WebDevFS {
       const imageData = new ImageData(new Uint8ClampedArray(data), this.canvas.width, this.canvas.height)
       this.ctx.putImageData(imageData, 0, 0)
     }
-    if (name === 'dsp' && data.byteLength && this.audioCtx) {
-      this?.dsp?.port?.postMessage(data)
+    if (name === 'dsp' && data.byteLength && this.audioBuffer) {
+      this.audioBuffer.set(data)
+      this.dsp.port?.postMessage(this.audioBuffer)
     }
   }
 }

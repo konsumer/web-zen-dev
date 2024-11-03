@@ -61,17 +61,16 @@ function makestaticFb() {
 makestaticFb()
 
 // example: write static to audio
-// TODO: not working right
-// const audioFrame = new Uint8Array(48000)
-// const audioView = new DataView(audioFrame.buffer)
-// function makestaticDsp() {
-// 	for (let i=0; i<audioFrame.byteLength;i+=4) {
-// 		audioView.setFloat32(i, Math.random() * 2 - 1) 
-// 	}
-// 	fs.promises.writeFile('/dev/dsp', audioFrame)
-// 	requestAnimationFrame(makestaticDsp)
-// }
-// makestaticDsp()
+const audioFrame = new Uint8Array(48000)
+const audioView = new DataView(audioFrame.buffer)
+function makestaticDsp() {
+	for (let i=0; i<audioFrame.byteLength;i+=4) {
+		audioView.setFloat32(i, Math.random() * 2 - 1) 
+	}
+	fs.promises.writeFile('/dev/dsp', audioFrame)
+	requestAnimationFrame(makestaticDsp)
+}
+makestaticDsp()
 
 </script>
 </body>
