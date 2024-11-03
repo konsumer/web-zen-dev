@@ -7,21 +7,31 @@
 	<script type="importmap">
     {
       "imports": {
-      	"web-devfs": "./web-devfs.js",
+      	"web-zen-dev": "./web-devfs.js",
         "@zenfs/core": "https://esm.sh/@zenfs/core",
         "@zenfs/dom": "https://esm.sh/@zenfs/dom"
       }
     }
   </script>
+  <style type="text/css">
+  	html, body {
+  		height: 100vh;
+  		margin: 0;
+  		display:flex;
+  		align-items: center;
+  		background: black;
+  	}
+  	canvas {
+  		width: 100vw;
+  	}
+  </style>
 </head>
 <body>
-
-<canvas id="fb" width="320" height="240" />
 
 <script type="module">
 import { configure, InMemory, fs } from '@zenfs/core'
 import { IndexedDB } from '@zenfs/dom'
-import WebDevFS from 'web-devfs'
+import WebDevFS from 'web-zen-dev'
 
 await configure({
 	mounts: {
@@ -32,16 +42,12 @@ await configure({
 })
 
 // TODO: work on a full backend-driver to make setup simpler
-const canvas = document.getElementById('fb')
 const wd = new WebDevFS()
-fs.mounts.get('/dev').createDevice('/fb0', wd.framebuffer(canvas))
+fs.mounts.get('/dev').createDevice('/fb0', wd.framebuffer())
 fs.mounts.get('/dev').createDevice('/dsp', wd.dsp())
 
-const screen = new Uint8Array(320*240*4)
-const audioFrame = new Uint8Array(48000)
-const audioView = new DataView(audioFrame.buffer)
-
 // example: write static to framebuffer
+const screen = new Uint8Array(wd.canvas.width*wd.canvas.height*4)
 function makestaticFb() {
 	for (let i=0; i<screen.byteLength;i+=4) {
 		screen[i] = Math.random() * 255
@@ -55,14 +61,17 @@ function makestaticFb() {
 makestaticFb()
 
 // example: write static to audio
-function makestaticDsp() {
-	for (let i=0; i<audioFrame.byteLength;i+=4) {
-		audioView.setFloat32(i, Math.random() * 2 - 1) 
-	}
-	fs.promises.writeFile('/dev/dsp', audioFrame)
-	requestAnimationFrame(makestaticDsp)
-}
-makestaticDsp()
+// TODO: not working right
+// const audioFrame = new Uint8Array(48000)
+// const audioView = new DataView(audioFrame.buffer)
+// function makestaticDsp() {
+// 	for (let i=0; i<audioFrame.byteLength;i+=4) {
+// 		audioView.setFloat32(i, Math.random() * 2 - 1) 
+// 	}
+// 	fs.promises.writeFile('/dev/dsp', audioFrame)
+// 	requestAnimationFrame(makestaticDsp)
+// }
+// makestaticDsp()
 
 </script>
 </body>

@@ -2,7 +2,7 @@
 
 export class WebDevFS {
   framebuffer (canvas) {
-    if (!canvas) {
+    if (typeof canvas === 'undefined') {
       canvas = document.createElement('canvas')
       document.body.appendChild(canvas)
     }

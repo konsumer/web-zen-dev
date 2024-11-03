@@ -13,7 +13,6 @@ class WebDevFSDsp extends AudioWorkletProcessor {
 
   process (inputs, outputs, parameters) {
     outputs[0].forEach((channel) => {
-      console.log(channel.length)
       for (let i = 0; i < channel.length; i++) {
         // const b = Math.random() * 2 - 1
         const b = this.buffer[i]
