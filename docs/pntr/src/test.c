@@ -14,6 +14,7 @@ static pntr_font* defaultFont;
 static char* fpsText;
 static int frameCount = 0;
 
+// int to string
 char* itoa(int value, char* result, int base) {
     // check that the base if valid
     if (base < 2 || base > 36) { *result = '\0'; return result; }
@@ -46,6 +47,7 @@ int rando() {
   return x ^= x << 10, x ^= x >> 13, (int)(x ^= x >> 10);
 }
 
+// ddraw some random circles
 void drawCircles(){
   static int x[3] = {0,0,0};
   static int y[3] = {0,0,0};
@@ -64,7 +66,8 @@ void drawCircles(){
   pntr_draw_circle_fill(screen, x[2], y[2], 80, PNTR_RED);
 }
 
-void updateFps(){
+// draw the FPS-counter
+void drawFps(){
   static time_t previousTime = 0;
   static time_t currentTime = 0;
   static int fps = 0;
@@ -84,8 +87,8 @@ void updateFps(){
 __attribute__((export_name("update")))
 void update() {
   pntr_clear_background(screen, PNTR_RAYWHITE);
-  updateFps();
   drawCircles();
+  drawFps();
   pntr_draw_text(screen, defaultFont, "If you can see this, it's working!", 180, SCREEN_HEIGHT/2, PNTR_BLACK);
 
   // write screen to framebuffer
@@ -106,6 +109,6 @@ int main() {
     fprintf(stderr, "Error opening framebuffer\n");
     return 1;
   }
-
+  
   return 0;
 }
