@@ -27,7 +27,7 @@ This is a simple demo that uses <a href="https://github.com/robloach/pntr">pntr<
 <script type="module">
 import { configure, InMemory, fs } from '@zenfs/core'
 import { IndexedDB } from '@zenfs/dom'
-import { WasiPreview1 } from 'easywasi'
+import { WasiPreview1, defs } from 'easywasi'
 import WebDevFS from 'web-zen-dev'
 
 await configure({ addDevices: true })
@@ -35,7 +35,7 @@ const canvas = document.getElementById('fb')
 const wd = new WebDevFS()
 fs.mounts.get('/dev').createDevice('/fb0', wd.framebuffer(canvas))
 
-const wasi_snapshot_preview1 = new WasiPreview1()
+const wasi_snapshot_preview1 = new WasiPreview1({fs})
 const {instance: { exports }} = await WebAssembly.instantiateStreaming(fetch('test.wasm'), {
   wasi_snapshot_preview1
 })
@@ -43,8 +43,6 @@ wasi_snapshot_preview1.start(exports)
 
 function updateScreen() {
   const sp = exports.update()
-  const screen = new Uint8Array(exports.memory.buffer).slice(sp, sp + (640 * 480 * 4))
-  fs.writeFileSync('/dev/fb0', screen)
   requestAnimationFrame(updateScreen)
 }
 updateScreen()
