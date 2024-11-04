@@ -41,7 +41,6 @@ await configure({
   addDevices: true
 })
 
-const canvas = document.getElementById('fb')
 const wd = new WebDevFS()
 fs.mounts.get('/dev').createDevice('/fb0', wd.framebuffer())
 fs.mounts.get('/dev').createDevice('/dsp', wd.dsp())
