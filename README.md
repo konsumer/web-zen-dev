@@ -1,5 +1,5 @@
 > [!WARNING]  
-> Development has moved to [@zen-fs/devices](https://github.com/zen-fs/devices). THis is where I worked our original ideas, but you should use that instead.
+> Development has moved to [@zen-fs/devices](https://github.com/zen-fs/devices). This is where I worked our original ideas, but you should use that instead.
 
 Write old-linux-style code in any language that targets wasm/wasi, and run it on the web (or anywhere else with js.)
 
