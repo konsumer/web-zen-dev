@@ -4,60 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>web-devfs</title>
-  <script type="importmap">
-    {
-      "imports": {
-        "web-zen-dev": "./web-devfs.js",
-        "@zenfs/core": "https://esm.sh/@zenfs/core",
-        "@zenfs/dom": "https://esm.sh/@zenfs/dom"
-      }
-    }
-  </script>
-  <link rel="stylesheet" href="./demo.css">
+  <link rel="stylesheet" href="./demo.css" />
+  <link rel="icon" type="image/png" href="https://avatars.githubusercontent.com/u/83857" />
 </head>
 <body>
 
-<canvas id="fb" width=640 height=480 />
+<p>There are a few demos here:</p>
 
-<script type="module">
-import { configure, InMemory, fs } from '@zenfs/core'
-import { IndexedDB } from '@zenfs/dom'
-import WebDevFS from 'web-zen-dev'
+<ul>
+  <li><a href="static">Static</a> - a fast js-side demo of fb/dsp</li>
+  <li><a href="pntr">Pntr</a> - drawing in C/WASI</li>
+</ul>
 
-await configure({ addDevices: true })
-const canvas = document.getElementById('fb')
-
-// TODO: work on a full backend-driver to make setup simpler
-const wd = new WebDevFS()
-fs.mounts.get('/dev').createDevice('/fb0', wd.framebuffer(canvas))
-fs.mounts.get('/dev').createDevice('/dsp', wd.dsp())
-
-// example: write static to framebuffer
-const screen = new Uint8Array(wd.canvas.width*wd.canvas.height*4)
-function makestaticFb() {
-  for (let i=0; i<screen.byteLength;i+=4) {
-    screen[i] = Math.random() * 255
-    screen[i+1] = Math.random() * 255
-    screen[i+2] = Math.random() * 255
-    screen[i+3] = 255
-  }
-  fs.promises.writeFile('/dev/fb0', screen)
-  requestAnimationFrame(makestaticFb)
-}
-makestaticFb()
-
-// example: write static to audio
-const audioBuffer = new ArrayBuffer(wd.audioCtx.sampleRate * 4)
-const audioBytes = new Uint8Array(audioBuffer)
-const audioFloats = new Float32Array(audioBuffer)
-setInterval(() => {
-  for (let i in audioFloats){
-    audioFloats[i] = Math.random() * 2 - 1
-  }
-  fs.promises.writeFile('/dev/dsp', audioBytes)
-}, 1000)
-
-</script>
 </body>
 </html>
 
