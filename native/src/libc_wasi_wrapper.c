@@ -200,8 +200,8 @@ static wasi_errno_t zenfs_open(wasi_fd_t fd, char* path) {
 }
 
 // called when a zendev device is written to by WASI
-static wasi_errno_t zenfs_write(wasi_fd_t fd, unsigned char* buffer) {
-  printf("WRITE %d\n", fd);
+static wasi_errno_t zenfs_write(wasi_fd_t fd, unsigned char* buffer, uint64 size) {
+  printf("WRITE %d: %zu\n", fd, size);
   return __WASI_ESUCCESS;
 }
 
@@ -210,20 +210,6 @@ static wasi_errno_t zenfs_close(wasi_fd_t fd) {
   printf("CLOSE %d\n", fd);
   return __WASI_ESUCCESS;
 }
-
-// these are callbacks
-
-// call this in your setup
-int zendev_setup(wasm_module_t module_inst);
-
-// called when a device is opened
-static wasi_errno_t zenfs_open(wasi_fd_t fd, char* path);
-
-// called when a device is written to
-static wasi_errno_t zenfs_write(wasi_fd_t fd, unsigned char* buffer);
-
-// called when a device is closed
-static wasi_errno_t zenfs_close(wasi_fd_t fd);
 
 ///
 
@@ -699,7 +685,7 @@ static wasi_errno_t wasi_fd_write(wasm_exec_env_t exec_env, wasi_fd_t fd,
         }
 
         // Write to special device
-        err = zenfs_write(fd, buf);
+        err = zenfs_write(fd, buf, total_size);
 
         // Set number of bytes written
         if (err == __WASI_ESUCCESS) {
