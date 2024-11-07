@@ -43,6 +43,8 @@ int main(int argc, char *argv[]) {
     goto fail;
   }
 
+  // here is how to add dirs to WASI
+  // https://github.com/bytecodealliance/wasm-micro-runtime/blob/e352f0ab101116c46a5a615d5139b70e8e9a3d47/core/iwasm/include/wasm_export.h#L715
   // wasm_runtime_set_wasi_args_ex(module, &wasi_dir, 1, NULL, 0, NULL, 0, NULL, 0, 0, 1, 2);
   
   module_inst = wasm_runtime_instantiate(module, stack_size, heap_size, error_buf, sizeof(error_buf));
