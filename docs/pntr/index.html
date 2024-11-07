@@ -29,7 +29,7 @@
       const canvas = document.getElementById('fb')
       fs.mounts.get('/dev').createDevice('/fb0', framebuffer({ canvas }))
 
-      const wasi_snapshot_preview1 = new WasiPreview1({ fs, debug: true })
+      const wasi_snapshot_preview1 = new WasiPreview1({ fs })
       const {
         instance: { exports }
       } = await WebAssembly.instantiateStreaming(fetch('test.wasm'), {
