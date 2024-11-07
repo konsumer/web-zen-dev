@@ -3,6 +3,7 @@
 #include "wasm_export.h"
 #include "bh_read_file.h"
 
+
 int main(int argc, char *argv[]) {
   if (argc != 2) {
     fprintf(stderr, "Usage: %s <WASM_FILE>\n", argv[0]);
