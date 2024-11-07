@@ -10,6 +10,9 @@
 #include "wasm_runtime_common.h"
 #include "wasmtime_ssp.h"
 
+// this must be disabled for this to work
+#define WASM_ENABLE_THREAD_MGR 0
+
 #if WASM_ENABLE_THREAD_MGR != 0
 #include "../../../thread-mgr/thread_manager.h"
 #endif
@@ -178,40 +181,7 @@ static wasi_errno_t convert_iovec_app_to_buffer(wasm_module_inst_t module_inst, 
   return __WASI_ESUCCESS;
 }
 
-///
-
-#define ZENDEV_ROOT 3
-#define ZENDEV_DEV 4
-#define ZENDEV_FB 5
-#define ZENDEV_DSP 6
-#define ZENDEV_KEYBOARD 7
-#define ZENDEV_MOUSE 8
-#define ZENDEV_GAMEPAD 9
-
-// called by host, this will setup hardware
-int zendev_setup(wasm_module_t module_inst) {
-  return __WASI_ESUCCESS;
-}
-
-// called when a zendev device is opened
-static wasi_errno_t zenfs_open(wasi_fd_t fd, char* path) {
-  printf("OPEN %d %s\n", fd, path);
-  return __WASI_ESUCCESS;
-}
-
-// called when a zendev device is written to by WASI
-static wasi_errno_t zenfs_write(wasi_fd_t fd, unsigned char* buffer, uint64 size) {
-  printf("WRITE %d: %zu\n", fd, size);
-  return __WASI_ESUCCESS;
-}
-
-// called when a zendev device is closed by WASI
-static wasi_errno_t zenfs_close(wasi_fd_t fd) {
-  printf("CLOSE %d\n", fd);
-  return __WASI_ESUCCESS;
-}
-
-///
+#include "wasi_zendev.h"
 
 static wasi_errno_t wasi_args_get(wasm_exec_env_t exec_env, uint32 *argv_offsets, char *argv_buf) {
   wasm_module_inst_t module_inst = get_module_inst(exec_env);
@@ -403,7 +373,7 @@ static wasi_errno_t wasi_fd_close(wasm_exec_env_t exec_env, wasi_fd_t fd) {
 
   if (!wasi_ctx) return (wasi_errno_t)-1;
 
-  if (fd == ZENDEV_FB || fd == ZENDEV_DSP || fd == ZENDEV_KEYBOARD || fd == ZENDEV_MOUSE || fd == ZENDEV_GAMEPAD){
+  if (zendev_is_device(fd)){
     return zenfs_close(fd);
   }
 
@@ -597,7 +567,7 @@ static wasi_errno_t wasi_fd_fdstat_get(wasm_exec_env_t exec_env, wasi_fd_t fd, w
     return 0;
   }
 
-  if (fd == ZENDEV_FB || fd == ZENDEV_DSP || fd == ZENDEV_KEYBOARD || fd == ZENDEV_MOUSE || fd == ZENDEV_GAMEPAD){
+  if (zendev_is_device(fd)){
     fdstat_app->fs_filetype = __WASI_FILETYPE_CHARACTER_DEVICE;
     return 0;
   }
@@ -669,7 +639,7 @@ static wasi_errno_t wasi_fd_write(wasm_exec_env_t exec_env, wasi_fd_t fd,
     }
 
     // Handle special file descriptors
-    if (fd == ZENDEV_FB || fd == ZENDEV_DSP || fd == ZENDEV_KEYBOARD || fd == ZENDEV_MOUSE || fd == ZENDEV_GAMEPAD) {
+    if (zendev_is_device(fd)) {
         uint8_t *buf = wasm_runtime_malloc(total_size);
         if (!buf) {
             printf("Failed to allocate buffer of size %lu\n", total_size);
@@ -754,26 +724,7 @@ static wasi_errno_t wasi_path_open(wasm_exec_env_t exec_env, wasi_fd_t dirfd, wa
   if (!validate_native_addr(fd_app, (uint64)sizeof(wasi_fd_t))) return (wasi_errno_t)-1;
 
   if (dirfd == ZENDEV_DEV) {
-    if (strncmp("fb", path, 2) == 0){
-      *fd_app = ZENDEV_FB;
-      return zenfs_open(ZENDEV_FB, path);
-    }
-    if (strncmp("dsp", path, 3) == 0){
-      *fd_app = ZENDEV_DSP;
-      return zenfs_open(ZENDEV_DSP, path);
-    }
-    if (strncmp("event0", path, 6) == 0){
-      *fd_app = ZENDEV_KEYBOARD;
-      return zenfs_open(ZENDEV_KEYBOARD, path);
-    }
-    if (strncmp("event1", path, 6) == 0){
-      *fd_app = ZENDEV_MOUSE;
-      return zenfs_open(ZENDEV_MOUSE, path);
-    }
-    if (strncmp("event2", path, 6) == 0){
-      *fd_app = ZENDEV_GAMEPAD;
-      return zenfs_open(ZENDEV_GAMEPAD, path);
-    }
+    return zenfs_open(dirfd, fd_app, path);
   }
 
   err = wasmtime_ssp_path_open(exec_env, curfds, dirfd, dirflags, path, path_len, oflags, fs_rights_base, fs_rights_inheriting, fs_flags, &fd);
