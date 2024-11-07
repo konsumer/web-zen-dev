@@ -18,7 +18,7 @@ class WebDevFSDsp extends AudioWorkletProcessor {
   }
 
   process (inputs, outputs, parameters) {
-    if (this.buffer.byteLength) {
+    if (this.buffer.byteLength >= 128) {
       outputs[0][0].set(this.buffer.slice(0, 128))
       this.buffer = this.buffer.slice(128)
     }
