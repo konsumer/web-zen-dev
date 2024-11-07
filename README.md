@@ -10,7 +10,7 @@ Also check out [@zen-fs/devices](https://github.com/zen-fs/devices). It's a type
 
 - [static](https://konsumer.js.org/web-zen-dev/static)
 - [drawing with pntr](https://konsumer.js.org/web-zen-dev/pntr)
-- [sound]((https://konsumer.js.org/web-zen-dev/sound)
+- [sound](https://konsumer.js.org/web-zen-dev/sound)
 
 ## devices
 
