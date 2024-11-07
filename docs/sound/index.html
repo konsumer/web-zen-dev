@@ -30,13 +30,16 @@
 
       // load a raw wav file and play it
       // find more breakbeats at https://rhythm-lab.com/breakbeats/
-      // sox hotpants.wav --encoding floating-point --endian little -r 48000 -t raw hotpants.raw
-      const hotpants = new Uint8Array(await fetch('hotpants.raw').then((r) => r.arrayBuffer()))
+      // sox souldrums.wav --encoding floating-point --endian little -c 1 -b 32 -r 48000 -t raw souldrums.raw
+      const souldrums = new Uint8Array(await fetch('souldrums.raw').then((r) => r.arrayBuffer()))
+      
+      // initially play, on load
+      fs.writeFileSync('/dev/dsp', souldrums)
 
-      // this is a simple loop
+      // this is a simple loop, it's exactly 5s
       setInterval(() => {
-        fs.writeFileSync('/dev/dsp', hotpants)
-      }, 800)
+        fs.writeFileSync('/dev/dsp', souldrums)
+      }, 5000)
     </script>
   </body>
 </html>

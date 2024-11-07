@@ -11,13 +11,16 @@ const workletUrl = URL.createObjectURL(
 class WebDevFSDsp extends AudioWorkletProcessor {
   constructor (...args) {
     super(...args)
-    this.port.onmessage = e => this.buffer = e.data
+    this.buffer = new Float32Array()
+    this.port.onmessage = e => {
+      this.buffer = new Float32Array(e.data)
+    }
   }
 
   process (inputs, outputs, parameters) {
-    if (this.buffer) {
-      const c = currentFrame % sampleRate
-      outputs[0][0].set(this.buffer.slice(c, c+128))
+    if (this.buffer.byteLength) {
+      outputs[0][0].set(this.buffer.slice(0, 128))
+      this.buffer = this.buffer.slice(128)
     }
     return true
   }
@@ -44,11 +47,9 @@ registerProcessor('webdevfs-dsp', WebDevFSDsp)
 )
 
 export async function dsp({ audioContext = new AudioContext() }) {
-  const audioBuffer = new ArrayBuffer(audioContext.sampleRate * 4 * 1000)
   await audioContext.audioWorklet.addModule(workletUrl)
   const dsp = new AudioWorkletNode(audioContext, 'webdevfs-dsp')
   dsp.connect(audioContext.destination)
-  dsp.port?.postMessage(audioBuffer)
 
   // add a click-handler to resume (due to web security) https://goo.gl/7K7WLu
   document.addEventListener('click', () => {
@@ -62,20 +63,10 @@ export async function dsp({ audioContext = new AudioContext() }) {
     isBuffered: false,
     audioContext,
     read() {},
-    write(
-      {
-        device: {
-          driver: { name },
-          ino
-        },
-        fs,
-        path,
-        position
-      },
-      data
-    ) {
-      new Uint8Array(audioBuffer).set(data)
-      dsp.port?.postMessage(new Float32Array(audioBuffer))
+    write({ device: { driver: { name }, ino }, fs, path, position }, data) {
+      if (data.byteLength) {
+        dsp.port?.postMessage(data.buffer)
+      }
     }
   }
 }
@@ -91,18 +82,7 @@ export function framebuffer({ canvas }) {
     isBuffered: false,
     canvas,
     read() {},
-    write(
-      {
-        device: {
-          driver: { name },
-          ino
-        },
-        fs,
-        path,
-        position
-      },
-      data
-    ) {
+    write({ device: { driver: { name }, ino }, fs, path, position }, data) {
       if (data?.length) {
         const imageData = new ImageData(new Uint8ClampedArray(data), canvas.width, canvas.height)
         ctx.putImageData(imageData, 0, 0)
