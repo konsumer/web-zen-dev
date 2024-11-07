@@ -9,6 +9,8 @@
 		"framebuffer",
 		"dsp",
 		"input",
+		"wasm",
+		"games",
 		"ZenFS"
 	],
 	"homepage": "https://github.com/konsumer/web-zen-dev",

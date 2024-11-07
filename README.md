@@ -1,4 +1,6 @@
-Write old-linux-style code in any language that targets wasm/wasi, and run it on the web (or anywhere else with js/canvas/audiocontext, like node, via other libraries.)
+This library allows you to easily make games in WASI that use 2D graphics, sound, and input. It's meant to be a light alternative to emscripten/SDL, but also allows other languages to target the web.
+
+It will run on web or anywhere else with js/canvas/audiocontext, like nodejs, via other libraries.
 
 I wanted to be able to use my [easywasi](https://github.com/konsumer/easywasi) with [zenfs](https://www.npmjs.com/package/@zenfs/core) to output graphics/sound and read input, over WASI fs.
 
