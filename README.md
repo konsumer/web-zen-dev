@@ -38,7 +38,7 @@ additionally, zenfs already provides these, if you use `addDevices:true`:
 You can use it like this:
 
 ```js
-import { configure, InMemory, fs } from '@zenfs/core'
+import { configure, fs } from '@zenfs/core'
 import WebDevFS from 'web-zen-dev'
 
 await configure({
