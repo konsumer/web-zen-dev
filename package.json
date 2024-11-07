@@ -2,7 +2,7 @@
 	"name": "web-zen-dev",
 	"version": "0.0.0",
 	"type": "module",
-	"description": "Devices for easywasi using ZenFS",
+	"description": "Easily make games in WASI that use 2D graphics, sound, and input",
 	"keywords": [
 		"devices",
 		"wasi",
