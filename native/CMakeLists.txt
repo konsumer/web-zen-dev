@@ -19,10 +19,9 @@ include (${wamr_SOURCE_DIR}/build-scripts/runtime_lib.cmake)
 # adjust WAMR_RUNTIME_LIB_SOURCE to use my WASI implementation
 string(REPLACE "${wamr_SOURCE_DIR}/core/iwasm/libraries/libc-wasi/libc_wasi_wrapper.c" "${CMAKE_SOURCE_DIR}/src/libc_wasi_wrapper.c" WAMR_LIB_SRC "${WAMR_RUNTIME_LIB_SOURCE}")
 add_library(vmlib ${WAMR_LIB_SRC})
-target_include_directories(vmlib PRIVATE "${wamr_SOURCE_DIR}/core/iwasm/libraries/libc-wasi/")
+target_include_directories(vmlib PRIVATE "${wamr_SOURCE_DIR}/core/iwasm/common/" "${wamr_SOURCE_DIR}/core/iwasm/include/" "${wamr_SOURCE_DIR}/core/iwasm/libraries/libc-wasi/")
 
 
 add_executable(host src/host.c ${wamr_SOURCE_DIR}/core/shared/utils/uncommon/bh_read_file.c)
 target_link_libraries(host vmlib)
 target_include_directories(host PRIVATE ${wamr_SOURCE_DIR}/core/shared/utils/uncommon)
-

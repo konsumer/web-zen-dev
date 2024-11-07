@@ -4,39 +4,42 @@
 #define PNTR_ENABLE_DEFAULT_FONT
 #define PNTR_PIXELFORMAT_RGBA
 #define PNTR_IMPLEMENTATION
-#include "pntr.h"
-
 #include <stdlib.h>
 #include <time.h>
+
+#include "pntr.h"
 
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 480
 
 // int to string
 char* itoa(int value, char* result, int base) {
-    // check that the base if valid
-    if (base < 2 || base > 36) { *result = '\0'; return result; }
-
-    char* ptr = result, *ptr1 = result, tmp_char;
-    int tmp_value;
-
-    do {
-        tmp_value = value;
-        value /= base;
-        *ptr++ = "zyxwvutsrqponmlkjihgfedcba9876543210123456789abcdefghijklmnopqrstuvwxyz" [35 + (tmp_value - value * base)];
-    } while ( value );
-
-    // Apply negative sign
-    if (tmp_value < 0) *ptr++ = '-';
-    *ptr-- = '\0';
-  
-    // Reverse the string
-    while(ptr1 < ptr) {
-        tmp_char = *ptr;
-        *ptr--= *ptr1;
-        *ptr1++ = tmp_char;
-    }
+  // check that the base if valid
+  if (base < 2 || base > 36) {
+    *result = '\0';
     return result;
+  }
+
+  char *ptr = result, *ptr1 = result, tmp_char;
+  int tmp_value;
+
+  do {
+    tmp_value = value;
+    value /= base;
+    *ptr++ = "zyxwvutsrqponmlkjihgfedcba9876543210123456789abcdefghijklmnopqrstuvwxyz"[35 + (tmp_value - value * base)];
+  } while (value);
+
+  // Apply negative sign
+  if (tmp_value < 0) *ptr++ = '-';
+  *ptr-- = '\0';
+
+  // Reverse the string
+  while (ptr1 < ptr) {
+    tmp_char = *ptr;
+    *ptr-- = *ptr1;
+    *ptr1++ = tmp_char;
+  }
+  return result;
 }
 
 // fake random
@@ -46,7 +49,7 @@ int rando() {
 }
 
 // draw the FPS-counter
-void drawFps(pntr_image* screen){
+void drawFps(pntr_image* screen) {
   static int frameCount = 0;
   static time_t previousTime = 0;
   static time_t currentTime = 0;
@@ -55,7 +58,7 @@ void drawFps(pntr_image* screen){
 
   frameCount++;
   currentTime = time(NULL);
-  if ( currentTime - previousTime >= 1.0 ) {
+  if (currentTime - previousTime >= 1.0) {
     previousTime = currentTime;
     fps = frameCount;
     frameCount = 0;
