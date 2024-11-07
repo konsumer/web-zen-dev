@@ -1,63 +1,60 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>web-devfs (static)</title>
-  <link rel="stylesheet" href="../demo.css" />
-  <link rel="icon" type="image/png" href="https://avatars.githubusercontent.com/u/83857" />
-  <script type="importmap">
-    {
-      "imports": {
-        "web-zen-dev": "../web-devfs.js",
-        "@zenfs/core": "https://esm.sh/@zenfs/core"
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>web-devfs (static)</title>
+    <link rel="stylesheet" href="../demo.css" />
+    <link rel="icon" type="image/png" href="https://avatars.githubusercontent.com/u/83857" />
+    <script type="importmap">
+      {
+        "imports": {
+          "web-zen-dev": "../web-devfs.js",
+          "@zenfs/core": "https://esm.sh/@zenfs/core"
+        }
       }
-    }
-  </script>
+    </script>
+  </head>
+  <body>
+    <p>This is a simple demo that creates static, in javascript. Click to hear sound.</p>
+    <canvas id="fb" width="640" height="480" />
 
-</head>
-<body>
+    <script type="module">
+      import { configure, InMemory, fs } from '@zenfs/core'
+      import { dsp, framebuffer } from 'web-zen-dev'
 
-<p>This is a simple demo that creates static, in javascript. Click to hear sound.</p>
-<canvas id="fb" width=640 height=480 />
+      // optional, but I set it here so I can get the size later
+      const canvas = document.getElementById('fb')
+      const audioContext = new AudioContext()
 
-<script type="module">
-import { configure, InMemory, fs } from '@zenfs/core'
-import { dsp, framebuffer } from 'web-zen-dev'
+      await configure({ addDevices: true })
+      fs.mounts.get('/dev').createDevice('/fb0', framebuffer({ canvas }))
+      fs.mounts.get('/dev').createDevice('/dsp', await dsp({ audioContext }))
 
-// optional, but I set it here so I can get the size later
-const canvas = document.getElementById('fb')
-const audioContext = new AudioContext()
+      // example: write static to framebuffer
+      const screen = new Uint8Array(canvas.width * canvas.height * 4)
+      function makestaticFb() {
+        for (let i = 0; i < screen.byteLength; i += 4) {
+          screen[i] = Math.random() * 255
+          screen[i + 1] = Math.random() * 255
+          screen[i + 2] = Math.random() * 255
+          screen[i + 3] = 255
+        }
+        fs.promises.writeFile('/dev/fb0', screen)
+        requestAnimationFrame(makestaticFb)
+      }
+      makestaticFb()
 
-await configure({ addDevices: true })
-fs.mounts.get('/dev').createDevice('/fb0', framebuffer({ canvas }))
-fs.mounts.get('/dev').createDevice('/dsp', await dsp({ audioContext }))
-
-// example: write static to framebuffer
-const screen = new Uint8Array(canvas.width * canvas.height*4)
-function makestaticFb() {
-  for (let i=0; i<screen.byteLength;i+=4) {
-    screen[i] = Math.random() * 255
-    screen[i+1] = Math.random() * 255
-    screen[i+2] = Math.random() * 255
-    screen[i+3] = 255
-  }
-  fs.promises.writeFile('/dev/fb0', screen)
-  requestAnimationFrame(makestaticFb)
-}
-makestaticFb()
-
-// example: write static to audio
-const audioBuffer = new ArrayBuffer(audioContext.sampleRate * 4)
-const audioBytes = new Uint8Array(audioBuffer)
-const audioFloats = new Float32Array(audioBuffer)
-setInterval(() => {
-  for (let i in audioFloats){
-    audioFloats[i] = Math.random() * 2 - 1
-  }
-  fs.promises.writeFile('/dev/dsp', audioBytes)
-}, 1000)
-
-</script>
-</body>
+      // example: write static to audio
+      const audioBuffer = new ArrayBuffer(audioContext.sampleRate * 4)
+      const audioBytes = new Uint8Array(audioBuffer)
+      const audioFloats = new Float32Array(audioBuffer)
+      setInterval(() => {
+        for (let i in audioFloats) {
+          audioFloats[i] = Math.random() * 2 - 1
+        }
+        fs.promises.writeFile('/dev/dsp', audioBytes)
+      }, 1000)
+    </script>
+  </body>
 </html>

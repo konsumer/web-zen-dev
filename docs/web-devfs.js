@@ -1,7 +1,10 @@
 /* global ImageData, AudioContext, AudioWorkletNode */
 
 // I inline worker, so no seperate file is needed for worker
-const workletUrl = URL.createObjectURL(new Blob([`
+const workletUrl = URL.createObjectURL(
+  new Blob(
+    [
+      `
 
 /* global AudioWorkletProcessor, registerProcessor, currentFrame, currentTime, sampleRate  */
 
@@ -34,9 +37,13 @@ class WebDevFSDsp extends AudioWorkletProcessor {
 
 registerProcessor('webdevfs-dsp', WebDevFSDsp)
 
-`], { type: 'application/javascript' }))
+`
+    ],
+    { type: 'application/javascript' }
+  )
+)
 
-export async function dsp ({ audioContext = new AudioContext() }) {
+export async function dsp({ audioContext = new AudioContext() }) {
   const audioBuffer = new ArrayBuffer(audioContext.sampleRate * 4 * 1000)
   await audioContext.audioWorklet.addModule(workletUrl)
   const dsp = new AudioWorkletNode(audioContext, 'webdevfs-dsp')
@@ -54,15 +61,26 @@ export async function dsp ({ audioContext = new AudioContext() }) {
     name: 'dsp',
     isBuffered: false,
     audioContext,
-    read () {},
-    write ({ device: { driver: { name }, ino }, fs, path, position }, data) {
+    read() {},
+    write(
+      {
+        device: {
+          driver: { name },
+          ino
+        },
+        fs,
+        path,
+        position
+      },
+      data
+    ) {
       new Uint8Array(audioBuffer).set(data)
       dsp.port?.postMessage(new Float32Array(audioBuffer))
     }
   }
 }
 
-export function framebuffer ({ canvas }) {
+export function framebuffer({ canvas }) {
   if (!canvas) {
     canvas = document.createElement('canvas')
     document.body.appendChild(canvas)
@@ -72,8 +90,19 @@ export function framebuffer ({ canvas }) {
     name: 'framebuffer',
     isBuffered: false,
     canvas,
-    read () {},
-    write ({ device: { driver: { name }, ino }, fs, path, position }, data) {
+    read() {},
+    write(
+      {
+        device: {
+          driver: { name },
+          ino
+        },
+        fs,
+        path,
+        position
+      },
+      data
+    ) {
       if (data?.length) {
         const imageData = new ImageData(new Uint8ClampedArray(data), canvas.width, canvas.height)
         ctx.putImageData(imageData, 0, 0)

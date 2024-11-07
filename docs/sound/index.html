@@ -1,45 +1,42 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>web-devfs (sound)</title>
-  <link rel="stylesheet" href="../demo.css" />
-  <link rel="icon" type="image/png" href="https://avatars.githubusercontent.com/u/83857" />
-  <script type="importmap">
-    {
-      "imports": {
-        "web-zen-dev": "../web-devfs.js",
-        "@zenfs/core": "https://esm.sh/@zenfs/core"
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>web-devfs (sound)</title>
+    <link rel="stylesheet" href="../demo.css" />
+    <link rel="icon" type="image/png" href="https://avatars.githubusercontent.com/u/83857" />
+    <script type="importmap">
+      {
+        "imports": {
+          "web-zen-dev": "../web-devfs.js",
+          "@zenfs/core": "https://esm.sh/@zenfs/core"
+        }
       }
-    }
-  </script>
+    </script>
+  </head>
+  <body>
+    <p>This is a simple demo that creates sound, in javascript. Click to hear it.</p>
 
-</head>
-<body>
+    <script type="module">
+      import { configure, fs } from '@zenfs/core'
+      import { dsp } from 'web-zen-dev'
 
-<p>This is a simple demo that creates sound, in javascript. Click to hear it.</p>
+      // optional, but I set it here so I can get the size later
+      const audioContext = new AudioContext()
 
-<script type="module">
-import { configure, fs } from '@zenfs/core'
-import { dsp } from 'web-zen-dev'
+      await configure({ addDevices: true })
+      fs.mounts.get('/dev').createDevice('/dsp', await dsp({ audioContext }))
 
-// optional, but I set it here so I can get the size later
-const audioContext = new AudioContext()
+      // load a raw wav file and play it
+      // find more breakbeats at https://rhythm-lab.com/breakbeats/
+      // sox hotpants.wav --encoding floating-point --endian little -r 48000 -t raw hotpants.raw
+      const hotpants = new Uint8Array(await fetch('hotpants.raw').then((r) => r.arrayBuffer()))
 
-await configure({ addDevices: true })
-fs.mounts.get('/dev').createDevice('/dsp', await dsp({ audioContext }))
-
-// load a raw wav file and play it
-// find more breakbeats at https://rhythm-lab.com/breakbeats/
-// sox hotpants.wav --encoding floating-point --endian little -r 48000 -t raw hotpants.raw
-const hotpants = new Uint8Array(await fetch('hotpants.raw').then(r => r.arrayBuffer()))
-
-// this is a simple loop
-setInterval(() => {
-  fs.writeFileSync('/dev/dsp', hotpants)
-}, 800)
-
-</script>
-</body>
+      // this is a simple loop
+      setInterval(() => {
+        fs.writeFileSync('/dev/dsp', hotpants)
+      }, 800)
+    </script>
+  </body>
 </html>

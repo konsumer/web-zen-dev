@@ -17,7 +17,8 @@
 	"author": "David Konsumer <konsumer@jetboystudio.com>",
 	"scripts": {
 		"start": "npx -y live-server docs",
-		"demo": "cd pntr_demo && cmake -B build && cmake --build build"
+		"demo": "cd pntr_demo && cmake -B build && cmake --build build",
+		"lint": "npx -y prettier --write docs"
 	},
 	"license": "MIT",
 	"repository": {

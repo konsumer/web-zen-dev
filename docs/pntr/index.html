@@ -1,48 +1,47 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>web-devfs (pntr)</title>
-  <link rel="stylesheet" href="../demo.css" />
-  <link rel="icon" type="image/png" href="https://avatars.githubusercontent.com/u/83857" />
-  <script type="importmap">
-    {
-      "imports": {
-        "web-zen-dev": "../web-devfs.js",
-        "easywasi": "https://esm.sh/easywasi",
-        "@zenfs/core": "https://esm.sh/@zenfs/core"
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>web-devfs (pntr)</title>
+    <link rel="stylesheet" href="../demo.css" />
+    <link rel="icon" type="image/png" href="https://avatars.githubusercontent.com/u/83857" />
+    <script type="importmap">
+      {
+        "imports": {
+          "web-zen-dev": "../web-devfs.js",
+          "easywasi": "https://esm.sh/easywasi",
+          "@zenfs/core": "https://esm.sh/@zenfs/core"
+        }
       }
-    }
-  </script>
-</head>
-<body>
+    </script>
+  </head>
+  <body>
+    <p>This is a simple demo that uses <a href="https://github.com/robloach/pntr">pntr</a> to draw on the framebuffer.</p>
+    <canvas id="fb" width="640" height="480" />
 
-<p>This is a simple demo that uses <a href="https://github.com/robloach/pntr">pntr</a> to draw on the framebuffer.</p>
-<canvas id="fb" width=640 height=480 />
+    <script type="module">
+      import { configure, fs } from '@zenfs/core'
+      import { WasiPreview1, defs } from 'easywasi'
+      import { framebuffer } from 'web-zen-dev'
 
-<script type="module">
-import { configure, fs } from '@zenfs/core'
-import { WasiPreview1, defs } from 'easywasi'
-import { framebuffer } from 'web-zen-dev'
+      await configure({ addDevices: true })
+      const canvas = document.getElementById('fb')
+      fs.mounts.get('/dev').createDevice('/fb0', framebuffer({ canvas }))
 
+      const wasi_snapshot_preview1 = new WasiPreview1({ fs })
+      const {
+        instance: { exports }
+      } = await WebAssembly.instantiateStreaming(fetch('test.wasm'), {
+        wasi_snapshot_preview1
+      })
+      wasi_snapshot_preview1.start(exports)
 
-await configure({ addDevices: true })
-const canvas = document.getElementById('fb')
-fs.mounts.get('/dev').createDevice('/fb0', framebuffer({canvas}))
-
-const wasi_snapshot_preview1 = new WasiPreview1({fs})
-const {instance: { exports }} = await WebAssembly.instantiateStreaming(fetch('test.wasm'), {
-  wasi_snapshot_preview1
-})
-wasi_snapshot_preview1.start(exports)
-
-function updateScreen() {
-  const sp = exports.update()
-  requestAnimationFrame(updateScreen)
-}
-updateScreen()
-
-</script>
-</body>
+      function updateScreen() {
+        const sp = exports.update()
+        requestAnimationFrame(updateScreen)
+      }
+      updateScreen()
+    </script>
+  </body>
 </html>
