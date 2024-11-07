@@ -39,7 +39,6 @@ You can use it like this:
 
 ```js
 import { configure, InMemory, fs } from '@zenfs/core'
-import { IndexedDB } from '@zenfs/dom'
 import WebDevFS from 'web-zen-dev'
 
 await configure({
@@ -47,8 +46,8 @@ await configure({
 })
 
 const wd = new WebDevFS()
-fs.mounts.get('/dev').createDevice('/fb0', wd.framebuffer())
-fs.mounts.get('/dev').createDevice('/dsp', wd.dsp())
+fs.mounts.get('/dev').createDevice('/fb0', framebuffer())
+fs.mounts.get('/dev').createDevice('/dsp', await dsp())
 ```
 
-You can see an example [here](docs/index.html).
+You can see an example [here](docs/).
