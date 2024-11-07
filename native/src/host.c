@@ -14,7 +14,7 @@ int main(int argc, char *argv[]) {
 
   wasm_function_inst_t cart_update = NULL;
 
-  static char global_heap_buf[512 * 1024];
+  static char global_heap_buf[8 * 1024 * 1024];  // 8MB global heap
   char *buffer, error_buf[128];
   const char *wasm_path = NULL;
   int opt, main_result = 1;
@@ -24,7 +24,9 @@ int main(int argc, char *argv[]) {
   wasm_module_t module = NULL;
   wasm_module_inst_t module_inst = NULL;
   wasm_exec_env_t exec_env = NULL;
-  uint32 buf_size, stack_size = 8092, heap_size = 8092;
+  uint32 buf_size,
+         stack_size = 256 * 1024,    // 256KB stack
+         heap_size = 4 * 1024 * 1024; // 4MB heap
 
   RuntimeInitArgs init_args;
   memset(&init_args, 0, sizeof(RuntimeInitArgs));

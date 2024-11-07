@@ -144,9 +144,20 @@ static wasi_errno_t convert_iovec_app_to_buffer(wasm_module_inst_t module_inst, 
   uint8 *buf = NULL;
   wasi_errno_t error;
 
-  error = allocate_iovec_app_buffer(module_inst, si_data, si_data_len, buf_ptr, buf_len);
+  // printf("Converting iovec to buffer, count: %u\n", si_data_len);
+
+  if (!validate_native_addr((void *)si_data,
+                        sizeof(iovec_app_t) * (uint64)si_data_len)) {
+      printf("validate_native_addr failed for iovec_app\n");
+      return __WASI_EINVAL;
+  }
+
+  error = allocate_iovec_app_buffer(module_inst, si_data, si_data_len,
+                                  buf_ptr, buf_len);
+  // printf("allocate_iovec_app_buffer result: %d\n", error);
+
   if (error != __WASI_ESUCCESS) {
-    return error;
+      return error;
   }
 
   buf = *buf_ptr;
@@ -169,36 +180,50 @@ static wasi_errno_t convert_iovec_app_to_buffer(wasm_module_inst_t module_inst, 
 
 ///
 
-#define ZENFS_ROOT 3
-#define ZENFS_DEV 4
-#define ZENFS_FB 5
-#define ZENFS_DSP 6
+#define ZENDEV_ROOT 3
+#define ZENDEV_DEV 4
+#define ZENDEV_FB 5
+#define ZENDEV_DSP 6
 #define ZENDEV_KEYBOARD 7
 #define ZENDEV_MOUSE 8
 #define ZENDEV_GAMEPAD 9
 
-// call this in your setup
+// called by host, this will setup hardware
 int zendev_setup(wasm_module_t module_inst) {
   return __WASI_ESUCCESS;
 }
 
-// called when a device is opened
+// called when a zendev device is opened
 static wasi_errno_t zenfs_open(wasi_fd_t fd, char* path) {
   printf("OPEN %d %s\n", fd, path);
   return __WASI_ESUCCESS;
 }
 
-// called when a device is written to
+// called when a zendev device is written to by WASI
 static wasi_errno_t zenfs_write(wasi_fd_t fd, unsigned char* buffer) {
   printf("WRITE %d\n", fd);
   return __WASI_ESUCCESS;
 }
 
-// called when a device is closed
+// called when a zendev device is closed by WASI
 static wasi_errno_t zenfs_close(wasi_fd_t fd) {
   printf("CLOSE %d\n", fd);
   return __WASI_ESUCCESS;
 }
+
+// these are callbacks
+
+// call this in your setup
+int zendev_setup(wasm_module_t module_inst);
+
+// called when a device is opened
+static wasi_errno_t zenfs_open(wasi_fd_t fd, char* path);
+
+// called when a device is written to
+static wasi_errno_t zenfs_write(wasi_fd_t fd, unsigned char* buffer);
+
+// called when a device is closed
+static wasi_errno_t zenfs_close(wasi_fd_t fd);
 
 ///
 
@@ -338,15 +363,15 @@ static wasi_errno_t wasi_fd_prestat_get(wasm_exec_env_t exec_env, wasi_fd_t fd, 
 
   if (!validate_native_addr(prestat_app, (uint64)sizeof(wasi_prestat_app_t))) return (wasi_errno_t)-1;
 
-  printf("wasi_fd_prestat_get: %d\n", fd);
+  // printf("wasi_fd_prestat_get: %d\n", fd);
 
-  if (fd == ZENFS_ROOT){
+  if (fd == ZENDEV_ROOT){
     prestat_app->pr_type = 0;
     prestat_app->pr_name_len = 1;
     return 0;
   }
 
-  if (fd == ZENFS_DEV){
+  if (fd == ZENDEV_DEV){
     prestat_app->pr_type = 0;
     prestat_app->pr_name_len = 4;
     return 0;
@@ -369,13 +394,13 @@ static wasi_errno_t wasi_fd_prestat_dir_name(wasm_exec_env_t exec_env, wasi_fd_t
 
   char* p;
 
-  if (fd == ZENFS_ROOT){
+  if (fd == ZENDEV_ROOT){
     p="/";
     memcpy(path, p, path_len);
     return 0;
   }
 
-  if (fd == ZENFS_DEV){
+  if (fd == ZENDEV_DEV){
     p="/dev";
     memcpy(path, p, path_len);
     return 0;
@@ -392,11 +417,7 @@ static wasi_errno_t wasi_fd_close(wasm_exec_env_t exec_env, wasi_fd_t fd) {
 
   if (!wasi_ctx) return (wasi_errno_t)-1;
 
-  if (fd == ZENFS_FB){
-    return zenfs_close(fd);
-  }
-
-  if (fd == ZENFS_DSP ){
+  if (fd == ZENDEV_FB || fd == ZENDEV_DSP || fd == ZENDEV_KEYBOARD || fd == ZENDEV_MOUSE || fd == ZENDEV_GAMEPAD){
     return zenfs_close(fd);
   }
 
@@ -585,22 +606,12 @@ static wasi_errno_t wasi_fd_fdstat_get(wasm_exec_env_t exec_env, wasi_fd_t fd, w
 
   if (!validate_native_addr(fdstat_app, (uint64)sizeof(wasi_fdstat_t))) return (wasi_errno_t)-1;
 
-  if (fd == ZENFS_ROOT){
+  if (fd == ZENDEV_ROOT || fd == ZENDEV_DEV){
     fdstat_app->fs_filetype = __WASI_FILETYPE_DIRECTORY;
     return 0;
   }
 
-  if (fd == ZENFS_DEV){
-    fdstat_app->fs_filetype = __WASI_FILETYPE_DIRECTORY;
-    return 0;
-  }
-
-  if (fd == ZENFS_FB){
-    fdstat_app->fs_filetype = __WASI_FILETYPE_CHARACTER_DEVICE;
-    return 0;
-  }
-
-  if (fd == ZENFS_DSP ){
+  if (fd == ZENDEV_FB || fd == ZENDEV_DSP || fd == ZENDEV_KEYBOARD || fd == ZENDEV_MOUSE || fd == ZENDEV_GAMEPAD){
     fdstat_app->fs_filetype = __WASI_FILETYPE_CHARACTER_DEVICE;
     return 0;
   }
@@ -642,73 +653,66 @@ static wasi_errno_t wasi_fd_sync(wasm_exec_env_t exec_env, wasi_fd_t fd) {
   return wasmtime_ssp_fd_sync(exec_env, curfds, fd);
 }
 
-static wasi_errno_t wasi_fd_write(wasm_exec_env_t exec_env, wasi_fd_t fd, const iovec_app_t *iovec_app, uint32 iovs_len, uint32 *nwritten_app) {
-  wasm_module_inst_t module_inst = get_module_inst(exec_env);
-  wasi_ctx_t wasi_ctx = get_wasi_ctx(module_inst);
-  struct fd_table *curfds = wasi_ctx_get_curfds(wasi_ctx);
-  wasi_ciovec_t *ciovec, *ciovec_begin;
-  uint64 total_size;
-  size_t nwritten;
-  uint32 i;
-  wasi_errno_t err;
-  uint8 *buf = NULL;
+static wasi_errno_t wasi_fd_write(wasm_exec_env_t exec_env, wasi_fd_t fd,
+                                 const iovec_app_t *iovec_app,
+                                 uint32 iovs_len,
+                                 uint32 *nwritten_app) {
+    wasm_module_inst_t module_inst = get_module_inst(exec_env);
+    wasi_ctx_t wasi_ctx = get_wasi_ctx(module_inst);
+    struct fd_table *curfds = wasi_ctx_get_curfds(wasi_ctx);
+    uint64 total_size = 0;
+    uint32 i;
+    wasi_errno_t err;
 
-  if (!wasi_ctx) return (wasi_errno_t)-1;
-
-  total_size = sizeof(iovec_app_t) * (uint64)iovs_len;
-  if (!validate_native_addr(nwritten_app, (uint64)sizeof(uint32)) || total_size >= UINT32_MAX || !validate_native_addr((void *)iovec_app, total_size)) return (wasi_errno_t)-1;
-
-  total_size = sizeof(wasi_ciovec_t) * (uint64)iovs_len;
-  if (total_size >= UINT32_MAX || !(ciovec_begin = wasm_runtime_malloc((uint32)total_size))) return (wasi_errno_t)-1;
-
-  ciovec = ciovec_begin;
-
-  for (i = 0; i < iovs_len; i++, iovec_app++, ciovec++) {
-    if (!validate_app_addr((uint64)iovec_app->buf_offset, (uint64)iovec_app->buf_len)) {
-      err = (wasi_errno_t)-1;
-      goto fail;
+    // Add validation for input parameters
+    if (!validate_native_addr(nwritten_app, sizeof(uint32))
+        || !validate_native_addr((void *)iovec_app,
+                               sizeof(iovec_app_t) * iovs_len)) {
+        printf("Invalid address validation\n");
+        return __WASI_EINVAL;
     }
-    ciovec->buf = (char *)addr_app_to_native((uint64)iovec_app->buf_offset);
-    ciovec->buf_len = iovec_app->buf_len;
-  }
 
-  // Handle special file descriptors
-  if (fd == ZENFS_FB || fd == ZENFS_DSP) {
-      // Convert the iovec array into a single buffer
-      err = convert_iovec_app_to_buffer(module_inst, iovec_app, iovs_len, &buf, &total_size);
-      // printf("write: %d %d %d\n", fd, err, total_size);
+    // Calculate total size and validate each iovec
+    for (i = 0; i < iovs_len; i++) {
+        if (!validate_app_addr(iovec_app[i].buf_offset,
+                             iovec_app[i].buf_len)) {
+            printf("Invalid buffer validation at index %d\n", i);
+            return __WASI_EINVAL;
+        }
+        total_size += iovec_app[i].buf_len;
+    }
 
-      // TODO: this currently returns __WASI_ENOMEM
-      return __WASI_ESUCCESS;
+    // Handle special file descriptors
+    if (fd == ZENDEV_FB || fd == ZENDEV_DSP || fd == ZENDEV_KEYBOARD || fd == ZENDEV_MOUSE || fd == ZENDEV_GAMEPAD) {
+        uint8_t *buf = wasm_runtime_malloc(total_size);
+        if (!buf) {
+            printf("Failed to allocate buffer of size %lu\n", total_size);
+            return __WASI_ENOMEM;
+        }
 
-      if (err != __WASI_ESUCCESS) {
-          return err;
-      }
+        // Copy data from all iovecs into continuous buffer
+        uint8_t *ptr = buf;
+        for (i = 0; i < iovs_len; i++) {
+            void *src = addr_app_to_native(iovec_app[i].buf_offset);
+            memcpy(ptr, src, iovec_app[i].buf_len);
+            ptr += iovec_app[i].buf_len;
+        }
 
-      // Call zenfs_write with the complete buffer
-      err = zenfs_write(fd, buf);
+        // Write to special device
+        err = zenfs_write(fd, buf);
 
-      // Free the temporary buffer
-      wasm_runtime_free(buf);
+        // Set number of bytes written
+        if (err == __WASI_ESUCCESS) {
+            *nwritten_app = total_size;
+        }
 
-      if (err == __WASI_ESUCCESS) {
-          *nwritten_app = (uint32)total_size;
-      }
+        wasm_runtime_free(buf);
+        return err;
+    }
 
-      return err;
-  }
-
-  err = wasmtime_ssp_fd_write(exec_env, curfds, fd, ciovec_begin, iovs_len, &nwritten);
-  if (err) goto fail;
-
-  *nwritten_app = (uint32)nwritten;
-
-  /* success */
-  err = 0;
-
-fail:
-  wasm_runtime_free(ciovec_begin);
-  return err;
+    // Handle regular files
+    return wasmtime_ssp_fd_write(exec_env, curfds, fd,
+                                iovec_app, iovs_len, nwritten_app);
 }
 
 static wasi_errno_t wasi_fd_advise(wasm_exec_env_t exec_env, wasi_fd_t fd, wasi_filesize_t offset, wasi_filesize_t len, wasi_advice_t advice) {
@@ -763,14 +767,26 @@ static wasi_errno_t wasi_path_open(wasm_exec_env_t exec_env, wasi_fd_t dirfd, wa
 
   if (!validate_native_addr(fd_app, (uint64)sizeof(wasi_fd_t))) return (wasi_errno_t)-1;
 
-  if (dirfd == ZENFS_DEV) {
+  if (dirfd == ZENDEV_DEV) {
     if (strncmp("fb", path, 2) == 0){
-      *fd_app = ZENFS_FB;
-      return zenfs_open(ZENFS_FB, path);
+      *fd_app = ZENDEV_FB;
+      return zenfs_open(ZENDEV_FB, path);
     }
     if (strncmp("dsp", path, 3) == 0){
-      *fd_app = ZENFS_DSP;
-      return zenfs_open(ZENFS_FB, path);
+      *fd_app = ZENDEV_DSP;
+      return zenfs_open(ZENDEV_DSP, path);
+    }
+    if (strncmp("event0", path, 6) == 0){
+      *fd_app = ZENDEV_KEYBOARD;
+      return zenfs_open(ZENDEV_KEYBOARD, path);
+    }
+    if (strncmp("event1", path, 6) == 0){
+      *fd_app = ZENDEV_MOUSE;
+      return zenfs_open(ZENDEV_MOUSE, path);
+    }
+    if (strncmp("event2", path, 6) == 0){
+      *fd_app = ZENDEV_GAMEPAD;
+      return zenfs_open(ZENDEV_GAMEPAD, path);
     }
   }
 
