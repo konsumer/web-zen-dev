@@ -1,8 +1,8 @@
 This library allows you to easily make games in WASI that use 2D graphics, sound, and input. It's meant to be a light alternative to emscripten/SDL, but also allows languages otehr than C to target the web.
 
-It will run on web or anywhere else with js/canvas/audiocontext, like nodejs, via other libraries.
-
 I wanted to be able to use my [easywasi](https://github.com/konsumer/easywasi) with [zenfs](https://www.npmjs.com/package/@zenfs/core) to output graphics/sound and read input, over WASI fs.
+
+It will run on web or anywhere else with js/canvas/audiocontext, like nodejs, via other libraries.
 
 Also check out [@zen-fs/devices](https://github.com/zen-fs/devices). It's a typescript-focused soft-fork of the work here.
 
