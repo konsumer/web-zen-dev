@@ -1,6 +1,34 @@
 {
+	"name": "web-zen-dev",
+	"version": "0.0.0",
+	"type": "module",
+	"description": "Devices for easywasi using ZenFS",
+	"keywords": [
+		"devices",
+		"wasi",
+		"framebuffer",
+		"dsp",
+		"input",
+		"ZenFS"
+	],
+	"homepage": "https://github.com/konsumer/web-zen-dev",
+	"author": "David Konsumer <konsumer@jetboystudio.com>",
 	"scripts": {
 		"start": "npx -y live-server docs",
-		"demo": "cd pntr_demo && make"
-	}
+		"demo": "cd pntr_demo && cmake -B build && cmake --build build"
+	},
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/konsumer/web-zen-dev.git"
+	},
+	"bugs": {
+		"url": "https://github.com/konsumer/web-zen-dev/issues"
+	},
+	"exports": {
+		".": "./docs/web-devfs.js"
+	},
+	"files": [
+		"./docs/web-devfs.js"
+	]
 }

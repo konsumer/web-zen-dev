@@ -3,39 +3,38 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>web-devfs</title>
+  <title>web-devfs (static)</title>
   <link rel="stylesheet" href="../demo.css" />
   <link rel="icon" type="image/png" href="https://avatars.githubusercontent.com/u/83857" />
   <script type="importmap">
     {
       "imports": {
         "web-zen-dev": "../web-devfs.js",
-        "@zenfs/core": "https://esm.sh/@zenfs/core",
-        "@zenfs/dom": "https://esm.sh/@zenfs/dom"
+        "@zenfs/core": "https://esm.sh/@zenfs/core"
       }
     }
   </script>
-  
+
 </head>
 <body>
 
+<p>This is a simple demo that creates static, in javascript. Click to hear sound.</p>
 <canvas id="fb" width=640 height=480 />
 
 <script type="module">
 import { configure, InMemory, fs } from '@zenfs/core'
-import { IndexedDB } from '@zenfs/dom'
-import WebDevFS from 'web-zen-dev'
+import { dsp, framebuffer } from 'web-zen-dev'
+
+// optional, but I set it here so I can get the size later
+const canvas = document.getElementById('fb')
+const audioContext = new AudioContext()
 
 await configure({ addDevices: true })
-const canvas = document.getElementById('fb')
-
-// TODO: work on a full backend-driver to make setup simpler
-const wd = new WebDevFS()
-fs.mounts.get('/dev').createDevice('/fb0', wd.framebuffer(canvas))
-fs.mounts.get('/dev').createDevice('/dsp', wd.dsp())
+fs.mounts.get('/dev').createDevice('/fb0', framebuffer({ canvas }))
+fs.mounts.get('/dev').createDevice('/dsp', await dsp({ audioContext }))
 
 // example: write static to framebuffer
-const screen = new Uint8Array(wd.canvas.width*wd.canvas.height*4)
+const screen = new Uint8Array(canvas.width * canvas.height*4)
 function makestaticFb() {
   for (let i=0; i<screen.byteLength;i+=4) {
     screen[i] = Math.random() * 255
@@ -49,7 +48,7 @@ function makestaticFb() {
 makestaticFb()
 
 // example: write static to audio
-const audioBuffer = new ArrayBuffer(wd.audioCtx.sampleRate * 4)
+const audioBuffer = new ArrayBuffer(audioContext.sampleRate * 4)
 const audioBytes = new Uint8Array(audioBuffer)
 const audioFloats = new Float32Array(audioBuffer)
 setInterval(() => {
@@ -62,4 +61,3 @@ setInterval(() => {
 </script>
 </body>
 </html>
-

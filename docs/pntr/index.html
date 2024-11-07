@@ -11,30 +11,25 @@
       "imports": {
         "web-zen-dev": "../web-devfs.js",
         "easywasi": "https://esm.sh/easywasi",
-        "@zenfs/core": "https://esm.sh/@zenfs/core",
-        "@zenfs/dom": "https://esm.sh/@zenfs/dom"
+        "@zenfs/core": "https://esm.sh/@zenfs/core"
       }
     }
   </script>
 </head>
 <body>
 
-<p>
-This is a simple demo that uses <a href="https://github.com/robloach/pntr">pntr</a> to draw on the framebuffer.
-</p>
-
+<p>This is a simple demo that uses <a href="https://github.com/robloach/pntr">pntr</a> to draw on the framebuffer.</p>
 <canvas id="fb" width=640 height=480 />
 
 <script type="module">
-import { configure, InMemory, fs } from '@zenfs/core'
-import { IndexedDB } from '@zenfs/dom'
+import { configure, fs } from '@zenfs/core'
 import { WasiPreview1, defs } from 'easywasi'
-import WebDevFS from 'web-zen-dev'
+import { framebuffer } from 'web-zen-dev'
+
 
 await configure({ addDevices: true })
 const canvas = document.getElementById('fb')
-const wd = new WebDevFS()
-fs.mounts.get('/dev').createDevice('/fb0', wd.framebuffer(canvas))
+fs.mounts.get('/dev').createDevice('/fb0', framebuffer({canvas}))
 
 const wasi_snapshot_preview1 = new WasiPreview1({fs})
 const {instance: { exports }} = await WebAssembly.instantiateStreaming(fetch('test.wasm'), {
@@ -51,4 +46,3 @@ updateScreen()
 </script>
 </body>
 </html>
-

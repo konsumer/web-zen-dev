@@ -1,6 +1,6 @@
 /* global ImageData, AudioContext, AudioWorkletNode */
 
-// I inline worker, so no seperate file is needed.
+// I inline worker, so no seperate file is needed for worker
 const workletUrl = URL.createObjectURL(new Blob([`
 
 /* global AudioWorkletProcessor, registerProcessor, currentFrame, currentTime, sampleRate  */
@@ -36,61 +36,48 @@ registerProcessor('webdevfs-dsp', WebDevFSDsp)
 
 `], { type: 'application/javascript' }))
 
-export class WebDevFS {
-  framebuffer (canvas) {
-    if (typeof canvas === 'undefined') {
-      canvas = document.createElement('canvas')
-      document.body.appendChild(canvas)
+export async function dsp ({ audioContext = new AudioContext() }) {
+  const audioBuffer = new ArrayBuffer(audioContext.sampleRate * 4 * 1000)
+  await audioContext.audioWorklet.addModule(workletUrl)
+  const dsp = new AudioWorkletNode(audioContext, 'webdevfs-dsp')
+  dsp.connect(audioContext.destination)
+  dsp.port?.postMessage(audioBuffer)
+
+  // add a click-handler to resume (due to web security) https://goo.gl/7K7WLu
+  document.addEventListener('click', () => {
+    if (audioContext.state !== 'running') {
+      audioContext.resume()
     }
-    this.canvas = canvas
-    this.ctx = canvas.getContext('2d')
-    return {
-      name: 'framebuffer',
-      isBuffered: false,
-      read () {},
-      write: this.write.bind(this)
-    }
-  }
+  })
 
-  dsp (audioCtx = new AudioContext()) {
-    this.audioCtx = audioCtx
-    this.audioBuffer = new ArrayBuffer(audioCtx.sampleRate * 4)
-
-    audioCtx.audioWorklet.addModule(workletUrl).then(() => {
-      this.dsp = new AudioWorkletNode(
-        audioCtx,
-        'webdevfs-dsp'
-      )
-      this.dsp.connect(audioCtx.destination)
-      this.dsp.port?.postMessage(this.audioBuffer)
-    })
-
-    // add a click-handler to resume (due to web security) https://goo.gl/7K7WLu
-    document.addEventListener('click', () => {
-      if (this.audioCtx.state !== 'running') {
-        this.audioCtx.resume()
-      }
-    })
-
-    return {
-      name: 'dsp',
-      isBuffered: false,
-      read () {},
-      write: this.write.bind(this)
-    }
-  }
-
-  write ({ device: { driver: { name }, ino }, fs, path, position }, data) {
-    // TODO: these are rudimentary, and do not account for position
-
-    if (name === 'framebuffer' && data.byteLength && this.canvas) {
-      const imageData = new ImageData(new Uint8ClampedArray(data), this.canvas.width, this.canvas.height)
-      this.ctx.putImageData(imageData, 0, 0)
-    }
-    if (name === 'dsp' && data.byteLength && this.audioBuffer) {
-      new Uint8Array(this.audioBuffer).set(data)
-      this.dsp.port?.postMessage(new Float32Array(this.audioBuffer))
+  return {
+    name: 'dsp',
+    isBuffered: false,
+    audioContext,
+    read () {},
+    write ({ device: { driver: { name }, ino }, fs, path, position }, data) {
+      new Uint8Array(audioBuffer).set(data)
+      dsp.port?.postMessage(new Float32Array(audioBuffer))
     }
   }
 }
-export default WebDevFS
+
+export function framebuffer ({ canvas }) {
+  if (!canvas) {
+    canvas = document.createElement('canvas')
+    document.body.appendChild(canvas)
+  }
+  const ctx = canvas.getContext('2d')
+  return {
+    name: 'framebuffer',
+    isBuffered: false,
+    canvas,
+    read () {},
+    write ({ device: { driver: { name }, ino }, fs, path, position }, data) {
+      if (data?.length) {
+        const imageData = new ImageData(new Uint8ClampedArray(data), canvas.width, canvas.height)
+        ctx.putImageData(imageData, 0, 0)
+      }
+    }
+  }
+}
