@@ -46,7 +46,9 @@ registerProcessor('webdevfs-dsp', WebDevFSDsp)
   )
 )
 
-export async function dsp({ audioContext = new AudioContext() }) {
+export async function dsp(options={}) {
+  options.audioContext ||= new AudioContext()
+  const { audioContext } = options
   await audioContext.audioWorklet.addModule(workletUrl)
   const dsp = new AudioWorkletNode(audioContext, 'webdevfs-dsp')
   dsp.connect(audioContext.destination)

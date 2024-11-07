@@ -22,11 +22,8 @@
       import { configure, fs } from '@zenfs/core'
       import { dsp } from 'web-zen-dev'
 
-      // optional, but I set it here so I can get the size later
-      const audioContext = new AudioContext()
-
       await configure({ addDevices: true })
-      fs.mounts.get('/dev').createDevice('/dsp', await dsp({ audioContext }))
+      fs.mounts.get('/dev').createDevice('/dsp', await dsp())
 
       // load a raw wav file and play it
       // find more breakbeats at https://rhythm-lab.com/breakbeats/
