@@ -18,7 +18,7 @@ These are the devices I am implementing here:
 
 - `/dev/dsp` - sound (similar to OSS)
 - `/dev/fb0` - 2D graphics (framebuffer)
-- `/dev/input/*` - actual input devices
+- `/dev/input/*` - input devices (keyboard, mouse, gamepad)
 
 and maybe this:
 
