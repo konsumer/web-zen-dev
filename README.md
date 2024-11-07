@@ -1,4 +1,4 @@
-This library allows you to easily make games in WASI that use 2D graphics, sound, and input. It's meant to be a light alternative to emscripten/SDL, but also allows other languages to target the web.
+This library allows you to easily make games in WASI that use 2D graphics, sound, and input. It's meant to be a light alternative to emscripten/SDL, but also allows languages otehr than C to target the web.
 
 It will run on web or anywhere else with js/canvas/audiocontext, like nodejs, via other libraries.
 
