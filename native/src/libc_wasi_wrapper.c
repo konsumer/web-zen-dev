@@ -111,6 +111,159 @@ wasi_ctx_get_ns_lookup_list(wasi_ctx_t wasi_ctx)
     return wasi_ctx->ns_lookup_list;
 }
 
+#define PRESTAT_DEV_FD 3
+#define PRESTAT_FRAMEBUFFER_FD 4
+#define PRESTAT_DSP_FD 5
+#define PRESTAT_KEYBOARD_FD 6
+#define PRESTAT_MOUSE_FD 7
+#define PRESTAT_GAMEPAD_FD 8
+
+wasi_errno_t zendev_setup(wasm_module_t module_inst) {
+    wasi_ctx_t wasi_ctx = wasm_runtime_get_wasi_ctx(module_inst);
+
+    // Add /dev prestat
+    return fd_prestats_insert(
+        wasi_ctx->prestats,
+        PRESTAT_DEV_FD,
+        "/dev",
+        4  // Length of "/dev"
+    );
+}
+
+static wasi_errno_t zendev_open(wasi_fd_t fd){
+    printf("open: %d\n", fd);
+    return __WASI_ESUCCESS;
+}
+
+static wasi_errno_t zendev_write(wasi_fd_t fd, const uint8* buffer, size_t size){
+    printf("write: %d - %zu\n", fd, size);
+    return __WASI_ESUCCESS;
+}
+
+static wasi_errno_t zendev_close(wasi_fd_t fd){
+    printf("close: %d\n", fd);
+    return __WASI_ESUCCESS;
+}
+
+static wasi_errno_t
+allocate_iovec_app_buffer(wasm_module_inst_t module_inst,
+                          const iovec_app_t *data, uint32 data_len,
+                          uint8 **buf_ptr, uint64 *buf_len)
+{
+    uint64 total_size = 0;
+    uint32 i;
+    uint8 *buf_begin = NULL;
+
+    if (data_len == 0) {
+        return __WASI_EINVAL;
+    }
+
+    total_size = sizeof(iovec_app_t) * (uint64)data_len;
+    if (total_size >= UINT32_MAX
+        || !validate_native_addr((void *)data, total_size))
+        return __WASI_EINVAL;
+
+    for (total_size = 0, i = 0; i < data_len; i++, data++) {
+        total_size += data->buf_len;
+    }
+
+    if (total_size == 0) {
+        return __WASI_EINVAL;
+    }
+
+    if (total_size >= UINT32_MAX
+        || !(buf_begin = wasm_runtime_malloc((uint32)total_size))) {
+        return __WASI_ENOMEM;
+    }
+
+    *buf_len = total_size;
+    *buf_ptr = buf_begin;
+
+    return __WASI_ESUCCESS;
+}
+
+static wasi_errno_t
+copy_buffer_to_iovec_app(wasm_module_inst_t module_inst, uint8 *buf_begin,
+                         uint32 buf_size, iovec_app_t *data, uint32 data_len,
+                         uint32 size_to_copy)
+{
+    uint8 *buf = buf_begin;
+    uint32 i;
+    uint32 size_to_copy_into_iovec;
+
+    if (buf_size < size_to_copy) {
+        return __WASI_EINVAL;
+    }
+
+    for (i = 0; i < data_len; data++, i++) {
+        char *native_addr;
+
+        if (!validate_app_addr((uint64)data->buf_offset,
+                               (uint64)data->buf_len)) {
+            return __WASI_EINVAL;
+        }
+
+        if (buf >= buf_begin + buf_size
+            /* integer overflow */
+            || data->buf_len > UINTPTR_MAX - (uintptr_t)buf
+            || buf + data->buf_len > buf_begin + buf_size
+            || size_to_copy == 0) {
+            break;
+        }
+
+        /**
+         * If our app buffer size is smaller than the amount to be copied,
+         * only copy the amount in the app buffer. Otherwise, we fill the iovec
+         * buffer and reduce size to copy on the next iteration
+         */
+        size_to_copy_into_iovec = min_uint32(data->buf_len, size_to_copy);
+
+        native_addr = (void *)addr_app_to_native((uint64)data->buf_offset);
+        bh_memcpy_s(native_addr, size_to_copy_into_iovec, buf,
+                    size_to_copy_into_iovec);
+        buf += size_to_copy_into_iovec;
+        size_to_copy -= size_to_copy_into_iovec;
+    }
+
+    return __WASI_ESUCCESS;
+}
+
+
+static wasi_errno_t
+convert_iovec_app_to_buffer(wasm_module_inst_t module_inst,
+                            const iovec_app_t *si_data, uint32 si_data_len,
+                            uint8 **buf_ptr, uint64 *buf_len)
+{
+    uint32 i;
+    const iovec_app_t *si_data_orig = si_data;
+    uint8 *buf = NULL;
+    wasi_errno_t error;
+
+    error = allocate_iovec_app_buffer(module_inst, si_data, si_data_len,
+                                      buf_ptr, buf_len);
+    if (error != __WASI_ESUCCESS) {
+        return error;
+    }
+
+    buf = *buf_ptr;
+    si_data = si_data_orig;
+    for (i = 0; i < si_data_len; i++, si_data++) {
+        char *native_addr;
+
+        if (!validate_app_addr((uint64)si_data->buf_offset,
+                               (uint64)si_data->buf_len)) {
+            wasm_runtime_free(*buf_ptr);
+            return __WASI_EINVAL;
+        }
+
+        native_addr = (char *)addr_app_to_native((uint64)si_data->buf_offset);
+        bh_memcpy_s(buf, si_data->buf_len, native_addr, si_data->buf_len);
+        buf += si_data->buf_len;
+    }
+
+    return __WASI_ESUCCESS;
+}
+
 static wasi_errno_t
 wasi_args_get(wasm_exec_env_t exec_env, uint32 *argv_offsets, char *argv_buf)
 {
@@ -302,6 +455,14 @@ wasi_fd_prestat_get(wasm_exec_env_t exec_env, wasi_fd_t fd,
     if (!validate_native_addr(prestat_app, (uint64)sizeof(wasi_prestat_app_t)))
         return (wasi_errno_t)-1;
 
+    // Handle /dev directory prestat
+    if (fd == PRESTAT_DEV_FD) {
+        prestat_app->pr_type = __WASI_PREOPENTYPE_DIR;
+        prestat_app->pr_name_len = 4;  // Length of "/dev"
+        return 0;
+    }
+
+    // Original implementation for other file descriptors
     err = wasmtime_ssp_fd_prestat_get(prestats, fd, &prestat);
     if (err)
         return err;
@@ -322,6 +483,16 @@ wasi_fd_prestat_dir_name(wasm_exec_env_t exec_env, wasi_fd_t fd, char *path,
     if (!wasi_ctx)
         return (wasi_errno_t)-1;
 
+    // Handle /dev directory
+    if (fd == PRESTAT_DEV_FD) {
+        if (path_len < 4)  // Length of "/dev"
+            return __WASI_EINVAL;
+
+        memcpy(path, "/dev", 4);
+        return 0;
+    }
+
+    // Original implementation for other directories
     return wasmtime_ssp_fd_prestat_dir_name(prestats, fd, path, path_len);
 }
 
@@ -332,6 +503,10 @@ wasi_fd_close(wasm_exec_env_t exec_env, wasi_fd_t fd)
     wasi_ctx_t wasi_ctx = get_wasi_ctx(module_inst);
     struct fd_table *curfds = wasi_ctx_get_curfds(wasi_ctx);
     struct fd_prestats *prestats = wasi_ctx_get_prestats(wasi_ctx);
+
+     if (fd == PRESTAT_DEV_FD) {
+        return zendev_close(fd);
+     }
 
     if (!wasi_ctx)
         return (wasi_errno_t)-1;
@@ -630,59 +805,103 @@ wasi_fd_sync(wasm_exec_env_t exec_env, wasi_fd_t fd)
     return wasmtime_ssp_fd_sync(exec_env, curfds, fd);
 }
 
+// static wasi_errno_t
+// wasi_fd_write(wasm_exec_env_t exec_env, wasi_fd_t fd,
+//               const iovec_app_t *iovec_app, uint32 iovs_len,
+//               uint32 *nwritten_app)
+// {
+//     wasm_module_inst_t module_inst = get_module_inst(exec_env);
+//     wasi_ctx_t wasi_ctx = get_wasi_ctx(module_inst);
+//     struct fd_table *curfds = wasi_ctx_get_curfds(wasi_ctx);
+//     wasi_ciovec_t *ciovec, *ciovec_begin;
+//     uint64 total_size;
+//     size_t nwritten;
+//     uint32 i;
+//     wasi_errno_t err;
+
+//     if (!wasi_ctx)
+//         return (wasi_errno_t)-1;
+
+//     total_size = sizeof(iovec_app_t) * (uint64)iovs_len;
+//     if (!validate_native_addr(nwritten_app, (uint64)sizeof(uint32))
+//         || total_size >= UINT32_MAX
+//         || !validate_native_addr((void *)iovec_app, total_size))
+//         return (wasi_errno_t)-1;
+
+//     total_size = sizeof(wasi_ciovec_t) * (uint64)iovs_len;
+//     if (total_size >= UINT32_MAX
+//         || !(ciovec_begin = wasm_runtime_malloc((uint32)total_size)))
+//         return (wasi_errno_t)-1;
+
+//     ciovec = ciovec_begin;
+
+//     for (i = 0; i < iovs_len; i++, iovec_app++, ciovec++) {
+//         if (!validate_app_addr((uint64)iovec_app->buf_offset,
+//                                (uint64)iovec_app->buf_len)) {
+//             err = (wasi_errno_t)-1;
+//             goto fail;
+//         }
+//         ciovec->buf = (char *)addr_app_to_native((uint64)iovec_app->buf_offset);
+//         ciovec->buf_len = iovec_app->buf_len;
+//     }
+
+//     err = wasmtime_ssp_fd_write(exec_env, curfds, fd, ciovec_begin, iovs_len,
+//                                 &nwritten);
+//     if (err)
+//         goto fail;
+
+//     *nwritten_app = (uint32)nwritten;
+
+//     /* success */
+//     err = 0;
+
+// fail:
+//     wasm_runtime_free(ciovec_begin);
+//     return err;
+// }
+
 static wasi_errno_t
 wasi_fd_write(wasm_exec_env_t exec_env, wasi_fd_t fd,
-              const iovec_app_t *iovec_app, uint32 iovs_len,
-              uint32 *nwritten_app)
+              const iovec_app_t *iov, uint32 iovs_len, uint32 *nwritten_app)
 {
     wasm_module_inst_t module_inst = get_module_inst(exec_env);
     wasi_ctx_t wasi_ctx = get_wasi_ctx(module_inst);
     struct fd_table *curfds = wasi_ctx_get_curfds(wasi_ctx);
     wasi_ciovec_t *ciovec, *ciovec_begin;
     uint64 total_size;
-    size_t nwritten;
-    uint32 i;
+    uint8 *buf = NULL;
     wasi_errno_t err;
 
     if (!wasi_ctx)
-        return (wasi_errno_t)-1;
+        return __WASI_EINVAL;
 
-    total_size = sizeof(iovec_app_t) * (uint64)iovs_len;
-    if (!validate_native_addr(nwritten_app, (uint64)sizeof(uint32))
-        || total_size >= UINT32_MAX
-        || !validate_native_addr((void *)iovec_app, total_size))
-        return (wasi_errno_t)-1;
+    if (!validate_native_addr(nwritten_app, (uint64)sizeof(uint32)))
+        return __WASI_EINVAL;
 
-    total_size = sizeof(wasi_ciovec_t) * (uint64)iovs_len;
-    if (total_size >= UINT32_MAX
-        || !(ciovec_begin = wasm_runtime_malloc((uint32)total_size)))
-        return (wasi_errno_t)-1;
+    // Check if this is a framebuffer write
+    if (fd == PRESTAT_FRAMEBUFFER_FD) {
+        // Convert iovec to a single buffer
+        err = convert_iovec_app_to_buffer(module_inst, iov, iovs_len, &buf, &total_size);
+        if (err != __WASI_ESUCCESS)
+            return err;
 
-    ciovec = ciovec_begin;
+        // Call your custom framebuffer handling function
+        err = zendev_write(fd, buf, total_size);
+        if (err != __WASI_ESUCCESS)
+            return err;
 
-    for (i = 0; i < iovs_len; i++, iovec_app++, ciovec++) {
-        if (!validate_app_addr((uint64)iovec_app->buf_offset,
-                               (uint64)iovec_app->buf_len)) {
-            err = (wasi_errno_t)-1;
-            goto fail;
-        }
-        ciovec->buf = (char *)addr_app_to_native((uint64)iovec_app->buf_offset);
-        ciovec->buf_len = iovec_app->buf_len;
+        // Clean up and return
+        if (buf)
+            wasm_runtime_free(buf);
+
+        if (err == __WASI_ESUCCESS)
+            *nwritten_app = total_size;
+
+        return err;
     }
 
-    err = wasmtime_ssp_fd_write(exec_env, curfds, fd, ciovec_begin, iovs_len,
-                                &nwritten);
-    if (err)
-        goto fail;
-
-    *nwritten_app = (uint32)nwritten;
-
-    /* success */
-    err = 0;
-
-fail:
-    wasm_runtime_free(ciovec_begin);
-    return err;
+    // Original fd_write implementation for other files
+    return wasmtime_ssp_fd_write(exec_env, curfds, fd, ciovec_begin, iovs_len, (size_t*)&total_size);
 }
 
 static wasi_errno_t
@@ -747,6 +966,33 @@ wasi_path_link(wasm_exec_env_t exec_env, wasi_fd_t old_fd,
                                   new_path_len);
 }
 
+// static wasi_errno_t
+// wasi_path_open(wasm_exec_env_t exec_env, wasi_fd_t dirfd,
+//                wasi_lookupflags_t dirflags, const char *path, uint32 path_len,
+//                wasi_oflags_t oflags, wasi_rights_t fs_rights_base,
+//                wasi_rights_t fs_rights_inheriting, wasi_fdflags_t fs_flags,
+//                wasi_fd_t *fd_app)
+// {
+//     wasm_module_inst_t module_inst = get_module_inst(exec_env);
+//     wasi_ctx_t wasi_ctx = get_wasi_ctx(module_inst);
+//     struct fd_table *curfds = wasi_ctx_get_curfds(wasi_ctx);
+//     wasi_fd_t fd = (wasi_fd_t)-1; /* set fd_app -1 if path open failed */
+//     wasi_errno_t err;
+
+//     if (!wasi_ctx)
+//         return (wasi_errno_t)-1;
+
+//     if (!validate_native_addr(fd_app, (uint64)sizeof(wasi_fd_t)))
+//         return (wasi_errno_t)-1;
+
+//     err = wasmtime_ssp_path_open(exec_env, curfds, dirfd, dirflags, path,
+//                                  path_len, oflags, fs_rights_base,
+//                                  fs_rights_inheriting, fs_flags, &fd);
+
+//     *fd_app = fd;
+//     return err;
+// }
+
 static wasi_errno_t
 wasi_path_open(wasm_exec_env_t exec_env, wasi_fd_t dirfd,
                wasi_lookupflags_t dirflags, const char *path, uint32 path_len,
@@ -766,13 +1012,26 @@ wasi_path_open(wasm_exec_env_t exec_env, wasi_fd_t dirfd,
     if (!validate_native_addr(fd_app, (uint64)sizeof(wasi_fd_t)))
         return (wasi_errno_t)-1;
 
-    err = wasmtime_ssp_path_open(exec_env, curfds, dirfd, dirflags, path,
-                                 path_len, oflags, fs_rights_base,
-                                 fs_rights_inheriting, fs_flags, &fd);
+    // Check if trying to open framebuffer
+    if (path_len == 8 && strncmp(path, "/dev/fb0", 8) == 0) {
+        // Open the actual framebuffer device
+        int native_fd = zendev_open(fd);
+        if (native_fd < 0) {
+            return __WASI_EACCES;
+        }
 
-    *fd_app = fd;
-    return err;
+        *fd_app = PRESTAT_FRAMEBUFFER_FD;
+        return __WASI_ESUCCESS;
+    }
+
+    // Original path_open implementation for other files
+    return wasmtime_ssp_path_open(exec_env, curfds, dirfd, dirflags, path,
+                                 path_len, oflags, fs_rights_base,
+                                 fs_rights_inheriting, fs_flags, fd_app);
 }
+
+
+
 
 static wasi_errno_t
 wasi_fd_readdir(wasm_exec_env_t exec_env, wasi_fd_t fd, void *buf,
@@ -790,8 +1049,45 @@ wasi_fd_readdir(wasm_exec_env_t exec_env, wasi_fd_t fd, void *buf,
     if (!validate_native_addr(bufused_app, (uint64)sizeof(uint32)))
         return (wasi_errno_t)-1;
 
+    // Handle /dev directory
+    if (fd == PRESTAT_DEV_FD) {
+        if (cookie == 0) {
+            // First entry: "."
+            struct dirent *dirent = (struct dirent *)buf;
+            dirent->d_ino = 1;  // Use appropriate inode number
+            dirent->d_type = DT_DIR;
+            strcpy(dirent->d_name, ".");
+            *bufused_app = sizeof(struct dirent);
+            return 0;
+        }
+        else if (cookie == 1) {
+            // Second entry: ".."
+            struct dirent *dirent = (struct dirent *)buf;
+            dirent->d_ino = 1;
+            dirent->d_type = DT_DIR;
+            strcpy(dirent->d_name, "..");
+            *bufused_app = sizeof(struct dirent);
+            return 0;
+        }
+        else if (cookie == 2) {
+            // Third entry: "fb0"
+            struct dirent *dirent = (struct dirent *)buf;
+            dirent->d_ino = 2;  // Use appropriate inode number
+            dirent->d_type = DT_CHR;  // Character device
+            strcpy(dirent->d_name, "fb0");
+            *bufused_app = sizeof(struct dirent);
+            return 0;
+        }
+        else {
+            // No more entries
+            *bufused_app = 0;
+            return 0;
+        }
+    }
+
+    // Original implementation for other directories
     err = wasmtime_ssp_fd_readdir(exec_env, curfds, fd, buf, buf_len, cookie,
-                                  &bufused);
+                                 &bufused);
     if (err)
         return err;
 
@@ -1966,89 +2262,6 @@ wasi_sock_set_ipv6_only(wasm_exec_env_t exec_env, wasi_fd_t fd, bool is_enabled)
 }
 
 static wasi_errno_t
-allocate_iovec_app_buffer(wasm_module_inst_t module_inst,
-                          const iovec_app_t *data, uint32 data_len,
-                          uint8 **buf_ptr, uint64 *buf_len)
-{
-    uint64 total_size = 0;
-    uint32 i;
-    uint8 *buf_begin = NULL;
-
-    if (data_len == 0) {
-        return __WASI_EINVAL;
-    }
-
-    total_size = sizeof(iovec_app_t) * (uint64)data_len;
-    if (total_size >= UINT32_MAX
-        || !validate_native_addr((void *)data, total_size))
-        return __WASI_EINVAL;
-
-    for (total_size = 0, i = 0; i < data_len; i++, data++) {
-        total_size += data->buf_len;
-    }
-
-    if (total_size == 0) {
-        return __WASI_EINVAL;
-    }
-
-    if (total_size >= UINT32_MAX
-        || !(buf_begin = wasm_runtime_malloc((uint32)total_size))) {
-        return __WASI_ENOMEM;
-    }
-
-    *buf_len = total_size;
-    *buf_ptr = buf_begin;
-
-    return __WASI_ESUCCESS;
-}
-
-static wasi_errno_t
-copy_buffer_to_iovec_app(wasm_module_inst_t module_inst, uint8 *buf_begin,
-                         uint32 buf_size, iovec_app_t *data, uint32 data_len,
-                         uint32 size_to_copy)
-{
-    uint8 *buf = buf_begin;
-    uint32 i;
-    uint32 size_to_copy_into_iovec;
-
-    if (buf_size < size_to_copy) {
-        return __WASI_EINVAL;
-    }
-
-    for (i = 0; i < data_len; data++, i++) {
-        char *native_addr;
-
-        if (!validate_app_addr((uint64)data->buf_offset,
-                               (uint64)data->buf_len)) {
-            return __WASI_EINVAL;
-        }
-
-        if (buf >= buf_begin + buf_size
-            /* integer overflow */
-            || data->buf_len > UINTPTR_MAX - (uintptr_t)buf
-            || buf + data->buf_len > buf_begin + buf_size
-            || size_to_copy == 0) {
-            break;
-        }
-
-        /**
-         * If our app buffer size is smaller than the amount to be copied,
-         * only copy the amount in the app buffer. Otherwise, we fill the iovec
-         * buffer and reduce size to copy on the next iteration
-         */
-        size_to_copy_into_iovec = min_uint32(data->buf_len, size_to_copy);
-
-        native_addr = (void *)addr_app_to_native((uint64)data->buf_offset);
-        bh_memcpy_s(native_addr, size_to_copy_into_iovec, buf,
-                    size_to_copy_into_iovec);
-        buf += size_to_copy_into_iovec;
-        size_to_copy -= size_to_copy_into_iovec;
-    }
-
-    return __WASI_ESUCCESS;
-}
-
-static wasi_errno_t
 wasi_sock_recv_from(wasm_exec_env_t exec_env, wasi_fd_t sock,
                     iovec_app_t *ri_data, uint32 ri_data_len,
                     wasi_riflags_t ri_flags, __wasi_addr_t *src_addr,
@@ -2117,41 +2330,6 @@ wasi_sock_recv(wasm_exec_env_t exec_env, wasi_fd_t sock, iovec_app_t *ri_data,
     *ro_flags = ri_flags;
 
     return error;
-}
-
-static wasi_errno_t
-convert_iovec_app_to_buffer(wasm_module_inst_t module_inst,
-                            const iovec_app_t *si_data, uint32 si_data_len,
-                            uint8 **buf_ptr, uint64 *buf_len)
-{
-    uint32 i;
-    const iovec_app_t *si_data_orig = si_data;
-    uint8 *buf = NULL;
-    wasi_errno_t error;
-
-    error = allocate_iovec_app_buffer(module_inst, si_data, si_data_len,
-                                      buf_ptr, buf_len);
-    if (error != __WASI_ESUCCESS) {
-        return error;
-    }
-
-    buf = *buf_ptr;
-    si_data = si_data_orig;
-    for (i = 0; i < si_data_len; i++, si_data++) {
-        char *native_addr;
-
-        if (!validate_app_addr((uint64)si_data->buf_offset,
-                               (uint64)si_data->buf_len)) {
-            wasm_runtime_free(*buf_ptr);
-            return __WASI_EINVAL;
-        }
-
-        native_addr = (char *)addr_app_to_native((uint64)si_data->buf_offset);
-        bh_memcpy_s(buf, si_data->buf_len, native_addr, si_data->buf_len);
-        buf += si_data->buf_len;
-    }
-
-    return __WASI_ESUCCESS;
 }
 
 static wasi_errno_t
