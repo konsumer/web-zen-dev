@@ -1,4 +1,4 @@
-This library allows you to easily make games in WASI that use 2D graphics, sound, and input. It's meant to be a light alternative to emscripten/SDL, but also allows languages otehr than C to target the web.
+This library allows you to easily make games in WASI that use 2D graphics, sound, and input. It's meant to be a light alternative to emscripten/SDL, but also allows languages other than C to target the web.
 
 I wanted to be able to use my [easywasi](https://github.com/konsumer/easywasi) with [zenfs](https://www.npmjs.com/package/@zenfs/core) to output graphics/sound and read input, over WASI fs.
 
@@ -39,13 +39,12 @@ You can use it like this:
 
 ```js
 import { configure, fs } from '@zenfs/core'
-import WebDevFS from 'web-zen-dev'
+import { framebuffer, dsp } from 'web-zen-dev'
 
 await configure({
   addDevices: true
 })
 
-const wd = new WebDevFS()
 fs.mounts.get('/dev').createDevice('/fb0', framebuffer())
 fs.mounts.get('/dev').createDevice('/dsp', await dsp())
 ```
